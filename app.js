@@ -11,6 +11,7 @@ const state = {
   videos: [],
   views: new Map(),
   localProgress: {},
+  progressSync: {},
   adminRows: [],
   adminAuthenticated: false
 };
@@ -223,8 +224,10 @@ function renderVideos() {
 
     const videoEl = card.querySelector("video");
     const completeBtn = card.querySelector(".complete-btn");
+    videoEl.addEventListener("loadedmetadata", () => restoreVideoPosition(video.id, videoEl));
     videoEl.addEventListener("play", () => startVideo(video.id));
     videoEl.addEventListener("timeupdate", () => handleVideoProgress(video.id, videoEl, card));
+    videoEl.addEventListener("pause", () => syncCurrentVideoProgress(video.id, videoEl));
     videoEl.addEventListener("ended", () => handleVideoProgress(video.id, videoEl, card, true));
     videoEl.addEventListener("error", () => showAlert(`El video ${getVideoCode(video) || video.title} no se pudo reproducir. Use el enlace "Abrir video en pestaña nueva" o revise la ruta en Supabase.`));
     completeBtn.addEventListener("click", () => completeVideo(video.id, card));
@@ -248,7 +251,7 @@ async function startVideo(videoId) {
 
   const { data, error } = await state.supabase
     .from("ehs_video_views")
-    .insert(payload)
+    .upsert(payload, { onConflict: "employee_id,video_id" })
     .select()
     .single();
 
@@ -258,12 +261,71 @@ async function startVideo(videoId) {
 function handleVideoProgress(videoId, videoEl, card, forceComplete = false) {
   if (!videoEl.duration || Number.isNaN(videoEl.duration)) return;
   const percent = Math.min(100, (videoEl.currentTime / videoEl.duration) * 100);
+  const nextProgress = forceComplete ? 100 : percent;
   if (!state.localProgress[videoId] || percent > state.localProgress[videoId]) {
-    state.localProgress[videoId] = forceComplete ? 100 : percent;
+    state.localProgress[videoId] = nextProgress;
     saveLocalProgress();
   }
   updateCardProgress(videoId, card);
   renderProgress();
+  syncPartialProgress(videoId, nextProgress, forceComplete);
+}
+
+function syncCurrentVideoProgress(videoId, videoEl) {
+  if (!videoEl.duration || Number.isNaN(videoEl.duration)) return;
+  const percent = Math.min(100, (videoEl.currentTime / videoEl.duration) * 100);
+  if (percent > 0) syncPartialProgress(videoId, percent, true);
+}
+
+function restoreVideoPosition(videoId, videoEl) {
+  const view = state.views.get(videoId);
+  if (view?.completed || !videoEl.duration || Number.isNaN(videoEl.duration)) return;
+
+  const progress = getVideoProgress(videoId, view);
+  if (progress < 2 || progress >= 95) return;
+
+  const resumeAt = Math.max(0, ((progress / 100) * videoEl.duration) - 5);
+  if (resumeAt > 0 && resumeAt < videoEl.duration) {
+    videoEl.currentTime = resumeAt;
+  }
+}
+
+async function syncPartialProgress(videoId, progress, force = false) {
+  if (!state.employee || !requireSupabase(false)) return;
+
+  const existing = state.views.get(videoId);
+  if (existing?.completed) return;
+
+  const now = Date.now();
+  const last = state.progressSync[videoId] || { at: 0, progress: Number(existing?.progress_percent || 0) };
+  const roundedProgress = Math.min(100, Math.round(progress));
+  const progressedEnough = roundedProgress >= last.progress + 5;
+  const waitedEnough = now - last.at >= 12000;
+
+  if (!force && roundedProgress < 1) return;
+  if (!force && !progressedEnough && !waitedEnough) return;
+
+  const payload = {
+    employee_id: state.employee.id,
+    video_id: videoId,
+    started_at: existing?.started_at || new Date().toISOString(),
+    progress_percent: Math.max(Number(existing?.progress_percent || 0), roundedProgress),
+    completed: false,
+    signature_required: true,
+    signature_reminder_ack: false,
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await state.supabase
+    .from("ehs_video_views")
+    .upsert(payload, { onConflict: "employee_id,video_id" })
+    .select()
+    .single();
+
+  if (!error && data) {
+    state.views.set(videoId, data);
+    state.progressSync[videoId] = { at: now, progress: Number(data.progress_percent || roundedProgress) };
+  }
 }
 
 function updateCardProgress(videoId, card) {
@@ -313,6 +375,7 @@ async function completeVideo(videoId, card) {
   }
 
   state.views.set(videoId, data);
+  state.progressSync[videoId] = { at: Date.now(), progress: Number(data.progress_percent || progress) };
   state.localProgress[videoId] = Math.max(state.localProgress[videoId] || 0, progress);
   saveLocalProgress();
   updateCardProgress(videoId, card);
