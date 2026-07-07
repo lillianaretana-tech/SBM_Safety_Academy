@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SBM Safety Academy | Microcapacitaciones EHS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="badge">SBM · EHS Microlearning</div>
+    <h1>Safety Academy</h1>
+    <p>Serie de 7 videos cortos de capacitación EHS. Debe verse cada video y firmarse una hoja RH-F-05 por cada tema.</p>
+  </header>
+
+  <main class="container">
+    <section class="panel notice">
+      <h2>Instrucciones</h2>
+      <p><strong>Ruta recomendada:</strong> ver al menos un video los lunes, miércoles y viernes.</p>
+      <p><strong>Ruta acelerada:</strong> si no hay videos de 4insite programados, ver un video por día de lunes a viernes hasta terminar.</p>
+      <p class="warning">El registro digital no sustituye la firma física. Al completar cada video, debe firmarse el formato RH-F-05 correspondiente.</p>
+      <a class="download" href="docs/RH-F-05-Control-de-asistencia-a-capacitaciones.xls" download>Descargar formato RH-F-05</a>
+    </section>
+
+    <section class="panel identity">
+      <h2>Datos del colaborador</h2>
+      <div class="grid-form">
+        <label>Nombre completo
+          <input id="employeeName" type="text" placeholder="Ejemplo: María Pérez" autocomplete="name" />
+        </label>
+        <label>Cédula o número de empleado
+          <input id="employeeId" type="text" placeholder="Ejemplo: 1-0000-0000" />
+        </label>
+        <label>Proyecto / Site
+          <input id="site" type="text" placeholder="Ejemplo: Bayer, Uber, McK..." />
+        </label>
+      </div>
+      <button id="saveProfile" class="primary">Guardar mis datos</button>
+      <p id="profileStatus" class="status"></p>
+    </section>
+
+    <section class="progress-card">
+      <div>
+        <span>Progreso local en este dispositivo</span>
+        <strong id="progressText">0 de 7 videos vistos</strong>
+      </div>
+      <div class="bar"><div id="progressBar"></div></div>
+    </section>
+
+    <section class="schedule panel">
+      <h2>Cronograma sugerido</h2>
+      <div class="schedule-grid">
+        <div><strong>Día 1 / Lunes</strong><span>EHS-I-05</span></div>
+        <div><strong>Día 2 / Miércoles</strong><span>EHS-I-12</span></div>
+        <div><strong>Día 3 / Viernes</strong><span>EHS-I-15</span></div>
+        <div><strong>Día 4 / Lunes</strong><span>EHS-I-18</span></div>
+        <div><strong>Día 5 / Miércoles</strong><span>EHS-I-20</span></div>
+        <div><strong>Día 6 / Viernes</strong><span>EHS-I-23</span></div>
+        <div><strong>Día 7 / Siguiente día disponible</strong><span>EHS-I-24</span></div>
+      </div>
+    </section>
+
+    <section id="videos" class="video-list"></section>
+  </main>
+
+  <footer>
+    <p>SBM Safety Academy · Control digital de apoyo · La evidencia oficial sigue siendo el RH-F-05 firmado.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
