@@ -3,74 +3,109 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SBM Safety Academy | Microcapacitaciones EHS</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>SBM Safety Academy</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="hero">
-    <div class="badge">SBM · EHS Microlearning</div>
-    <h1>Safety Academy</h1>
-    <p>Serie de 7 videos cortos de capacitación EHS. Debe verse cada video y firmarse una hoja RH-F-05 por cada tema.</p>
+    <div class="hero__badge">SBM Microlearning</div>
+    <h1>SBM Safety Academy</h1>
+    <p>Serie de microcapacitaciones EHS. Vea cada video completo, registre su avance y recuerde firmar el formato físico RH-F-05 correspondiente.</p>
   </header>
 
-  <main class="container">
-    <section class="panel notice">
-      <h2>Instrucciones</h2>
-      <p><strong>Ruta recomendada:</strong> ver al menos un video los lunes, miércoles y viernes.</p>
-      <p><strong>Ruta acelerada:</strong> si no hay videos de 4insite programados, ver un video por día de lunes a viernes hasta terminar.</p>
-      <p class="warning">El registro digital no sustituye la firma física. Al completar cada video, debe firmarse el formato RH-F-05 correspondiente.</p>
-      <a class="download" href="docs/RH-F-05-Control-de-asistencia-a-capacitaciones.pdf" download>Abrir / descargar formato RH-F-05</a>
-    </section>
-
-    <section class="panel identity">
-      <h2>Datos del colaborador</h2>
-      <div class="grid-form">
-        <label>Nombre completo
-          <input id="employeeName" type="text" placeholder="Ejemplo: María Pérez" autocomplete="name" />
+  <main class="app-shell">
+    <section id="loginPanel" class="card login-card">
+      <h2>Registro del colaborador</h2>
+      <p class="muted">Ingrese sus datos antes de iniciar. El proyecto puede escribirse completo o parcial.</p>
+      <form id="employeeForm" class="form-grid">
+        <label>
+          Nombre completo
+          <input id="employeeName" type="text" placeholder="Ej. María Rodríguez" required />
         </label>
-        <label>Cédula o número de empleado
-          <input id="employeeId" type="text" placeholder="Ejemplo: 1-0000-0000" />
+        <label>
+          Cédula
+          <input id="employeeCedula" type="text" placeholder="Ej. 1-1111-1111" required />
         </label>
-        <label>Proyecto / Site
-          <input id="site" type="text" placeholder="Ejemplo: Bayer, Uber, McK..." />
+        <label>
+          Proyecto / Site
+          <input id="employeeProject" type="text" placeholder="Ej. Bayer, DXC, McKinsey, Uber..." required />
         </label>
-      </div>
-      <button id="saveProfile" class="primary">Guardar mis datos</button>
-      <p id="profileStatus" class="status"></p>
+        <button type="submit" class="primary-btn">Iniciar capacitación</button>
+      </form>
     </section>
 
-    <section class="progress-card">
-      <div>
-        <span>Progreso local en este dispositivo</span>
-        <strong id="progressText">0 de 7 videos vistos</strong>
+    <section id="dashboard" class="hidden">
+      <div class="card profile-card">
+        <div>
+          <span class="eyebrow">Colaborador</span>
+          <h2 id="welcomeName">Bienvenido</h2>
+          <p id="welcomeMeta" class="muted"></p>
+        </div>
+        <button id="changeUserBtn" class="secondary-btn">Cambiar datos</button>
       </div>
-      <div class="bar"><div id="progressBar"></div></div>
-    </section>
 
-    <section class="schedule panel">
-      <h2>Cronograma sugerido</h2>
-      <div class="schedule-grid">
-        <div><strong>Día 1 / Lunes</strong><span>EHS-I-05</span></div>
-        <div><strong>Día 2 / Miércoles</strong><span>EHS-I-12</span></div>
-        <div><strong>Día 3 / Viernes</strong><span>EHS-I-15</span></div>
-        <div><strong>Día 4 / Lunes</strong><span>EHS-I-18</span></div>
-        <div><strong>Día 5 / Miércoles</strong><span>EHS-I-20</span></div>
-        <div><strong>Día 6 / Viernes</strong><span>EHS-I-23</span></div>
-        <div><strong>Día 7 / Siguiente día disponible</strong><span>EHS-I-24</span></div>
-      </div>
-    </section>
+      <section class="card progress-card">
+        <div class="progress-top">
+          <div>
+            <span class="eyebrow">Progreso</span>
+            <h2 id="progressText">0 de 7 completados</h2>
+          </div>
+          <strong id="progressPercent">0%</strong>
+        </div>
+        <div class="progress-bar"><span id="progressFill"></span></div>
+      </section>
 
-    <section id="videos" class="video-list"></section>
+      <section class="card instructions">
+        <h2>Plan sugerido</h2>
+        <p><strong>Ruta normal:</strong> ver videos lunes, miércoles y viernes si no hay capacitaciones 4insite programadas.</p>
+        <p><strong>Ruta acelerada:</strong> si no hay videos 4insite en la semana, ver un video por día de lunes a viernes hasta completar la serie.</p>
+        <p class="warning">El registro digital no sustituye la firma física. Debe firmarse una hoja RH-F-05 por cada video.</p>
+        <a class="doc-link" href="docs/RH-F-05-Control-de-asistencia-a-capacitaciones.pdf" target="_blank" rel="noopener">Abrir formato RH-F-05 PDF</a>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <h2>Videos EHS</h2>
+          <p>El botón de completar se activa cuando el video llega al final o al menos al 95%.</p>
+        </div>
+        <div id="videoGrid" class="video-grid"></div>
+      </section>
+
+      <section class="card admin-card">
+        <details>
+          <summary>Panel de seguimiento</summary>
+          <p class="muted">Filtre por nombre, cédula, proyecto o video. Este panel ayuda al seguimiento digital; la firma RH-F-05 sigue siendo el respaldo oficial.</p>
+          <div class="admin-actions">
+            <input id="adminFilter" type="search" placeholder="Filtrar por proyecto, persona, cédula o video..." />
+            <button id="refreshAdminBtn" class="secondary-btn">Actualizar</button>
+            <button id="exportCsvBtn" class="secondary-btn">Exportar CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Nombre</th>
+                  <th>Cédula</th>
+                  <th>Proyecto</th>
+                  <th>Video</th>
+                  <th>Avance</th>
+                  <th>Firma</th>
+                </tr>
+              </thead>
+              <tbody id="adminTableBody"></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+    </section>
   </main>
 
   <footer>
-    <p>SBM Safety Academy · Control digital de apoyo · La evidencia oficial sigue siendo el RH-F-05 firmado.</p>
+    SBM Safety Academy · Control digital de microcapacitaciones EHS
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>
 </html>

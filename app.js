@@ -1,171 +1,261 @@
-const SUPABASE_URL = "https://vgkyoyosjewdygxtnqvu.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZna3lveW9zamV3ZHlneHRucXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NTAxNDAsImV4cCI6MjA5ODIyNjE0MH0.oDxSWg61UFLqMh2MeEW6yxarZAjobhEA6TWm0KS_7CA";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL = 'https://vgkyoyosjewdygxtnqvu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZna3lveW9zamV3ZHlneHRucXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NTAxNDAsImV4cCI6MjA5ODIyNjE0MH0.oDxSWg61UFLqMh2MeEW6yxarZAjobhEA6TWm0KS_7CA';
+const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// IMPORTANTE: estos nombres deben ser idénticos a los archivos dentro de /videos en GitHub.
-const videos = [
-  { code: "EHS-I-05", title: "Decapado y encerado de pisos", file: "videos/EHS-I-05-Decapado-y-encerado-de-pisos.mp4", day: "Día 1 / Lunes" },
-  { code: "EHS-I-12", title: "Limpieza de baños", file: "videos/EHS-I-12-Limpieza-de-Banos.mp4", day: "Día 2 / Miércoles" },
-  { code: "EHS-I-15", title: "Limpieza de pisos con mopa", file: "videos/EHS-I-15-Limpieza-de-Pisos-con-Mopa.mp4", day: "Día 3 / Viernes" },
-  { code: "EHS-I-18", title: "Colocación de barricadas", file: "videos/EHS-I-18-Colocacion-de-barricadas.mp4", day: "Día 4 / Lunes" },
-  { code: "EHS-I-20", title: "Recolección segura de basura", file: "videos/EHS-I-20-Recoleccion-Segura-de-Basura.mp4", day: "Día 5 / Miércoles" },
-  { code: "EHS-I-23", title: "Traslado de objetos", file: "videos/EHS-I-23-Traslado-de-objetos.mp4", day: "Día 6 / Viernes" },
-  { code: "EHS-I-24", title: "Uso de estaciones de dilución y piletas de lavado", file: "videos/EHS-I-24-Uso-de-estaciones-de-dilucion-y-piletas-de-lavado.mp4", day: "Día 7 / Siguiente día disponible" }
+const FALLBACK_VIDEOS = [
+  { code: 'EHS-I-05', title: 'Decapado y encerado de pisos', category: 'EHS', sort_order: 1, file_candidates: ['EHS-I-05- Decapado y encerado de pisos.mp4', 'EHS-I-05-Decapado-y-encerado-de-pisos.mp4', 'EHS-I-05- Decapado y encerado de pisos(1).mp4'] },
+  { code: 'EHS-I-12', title: 'Limpieza de Baños', category: 'EHS', sort_order: 2, file_candidates: ['EHS-I-12 - Limpieza de Baños.mp4', 'EHS-I-12-Limpieza-de-Banos.mp4'] },
+  { code: 'EHS-I-15', title: 'Limpieza de Pisos con Mopa', category: 'EHS', sort_order: 3, file_candidates: ['EHS-I-15 Limpieza de Pisos con Mopa.mp4', 'EHS-I-15-Limpieza-de-Pisos-con-Mopa.mp4'] },
+  { code: 'EHS-I-18', title: 'Colocación de barricadas', category: 'EHS', sort_order: 4, file_candidates: ['EHS-I-18-Colocacion de barricadas.mp4', 'EHS-I-18-Colocacion-de-barricadas.mp4'] },
+  { code: 'EHS-I-20', title: 'Recolección Segura de Basura', category: 'EHS', sort_order: 5, file_candidates: ['EHS-I-20-Recolección Segura de Basura.mp4', 'EHS-I-20-Recoleccion-Segura-de-Basura.mp4'] },
+  { code: 'EHS-I-23', title: 'Traslado de objetos', category: 'EHS', sort_order: 6, file_candidates: ['EHS-I-23-Traslado de objetos.mp4', 'EHS-I-23-Traslado-de-objetos.mp4'] },
+  { code: 'EHS-I-24', title: 'Uso de estaciones de dilución y piletas de lavado', category: 'EHS', sort_order: 7, file_candidates: ['EHS-1-24-Uso de estaciones de dilución y piletas de lavado.mp4', 'EHS-I-24-Uso-de-estaciones-de-dilucion-y-piletas-de-lavado.mp4'] },
 ];
 
-const els = {
-  list: document.getElementById("videos"),
-  employeeName: document.getElementById("employeeName"),
-  employeeId: document.getElementById("employeeId"),
-  site: document.getElementById("site"),
-  saveProfile: document.getElementById("saveProfile"),
-  profileStatus: document.getElementById("profileStatus"),
-  progressText: document.getElementById("progressText"),
-  progressBar: document.getElementById("progressBar")
-};
+let currentEmployee = null;
+let videos = [];
+let completedByVideo = new Map();
+let adminRows = [];
 
-const storageKey = "sbm_safety_academy_profile";
-const completedKey = "sbm_safety_academy_completed";
+const qs = (id) => document.getElementById(id);
+const normalize = (value) => (value || '').toString().trim();
+const pct = (num) => `${Math.round(num || 0)}%`;
 
-function getProfile() {
-  try { return JSON.parse(localStorage.getItem(storageKey) || "{}"); }
-  catch { return {}; }
+function videoSources(video) {
+  const list = Array.isArray(video.file_candidates) && video.file_candidates.length ? video.file_candidates : [video.video_file].filter(Boolean);
+  return [...new Set(list.filter(Boolean))].map((file) => `videos/${file}`);
 }
 
-function saveProfile() {
-  const profile = {
-    employee_name: els.employeeName.value.trim(),
-    employee_id: els.employeeId.value.trim(),
-    project_site: els.site.value.trim()
+function saveEmployeeLocal(employee) {
+  localStorage.setItem('sbm_ehs_employee', JSON.stringify(employee));
+}
+function getEmployeeLocal() {
+  try { return JSON.parse(localStorage.getItem('sbm_ehs_employee') || 'null'); } catch { return null; }
+}
+
+async function upsertEmployee(form) {
+  const cedula = normalize(form.cedula);
+  const payload = {
+    full_name: normalize(form.full_name),
+    cedula,
+    project_site: normalize(form.project_site),
+    updated_at: new Date().toISOString(),
   };
-  localStorage.setItem(storageKey, JSON.stringify(profile));
-  els.profileStatus.textContent = "Datos guardados en este dispositivo.";
-  updateButtons();
+  const { data, error } = await client
+    .from('ehs_employees')
+    .upsert(payload, { onConflict: 'cedula' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
-function getCompleted() {
-  try { return JSON.parse(localStorage.getItem(completedKey) || "[]"); }
-  catch { return []; }
+async function loadVideos() {
+  const { data, error } = await client
+    .from('ehs_training_videos')
+    .select('*')
+    .eq('active', true)
+    .order('sort_order', { ascending: true });
+  if (error || !data || !data.length) return FALLBACK_VIDEOS;
+  return data;
 }
 
-function setCompleted(code) {
-  const completed = new Set(getCompleted());
-  completed.add(code);
-  localStorage.setItem(completedKey, JSON.stringify([...completed]));
-  updateProgress();
-}
-
-function updateProgress() {
-  const done = getCompleted().filter(code => videos.some(v => v.code === code)).length;
-  els.progressText.textContent = `${done} de ${videos.length} videos vistos`;
-  els.progressBar.style.width = `${(done / videos.length) * 100}%`;
-}
-
-function loadProfile() {
-  const profile = getProfile();
-  els.employeeName.value = profile.employee_name || "";
-  els.employeeId.value = profile.employee_id || "";
-  els.site.value = profile.project_site || profile.site || "";
-}
-
-function hasProfile() {
-  return els.employeeName.value.trim() && els.employeeId.value.trim();
-}
-
-function safeId(code) {
-  return code.replace(/[^a-zA-Z0-9]/g, "");
-}
-
-function updateButtons() {
-  document.querySelectorAll(".complete-btn").forEach(btn => {
-    const id = safeId(btn.dataset.code);
-    const ack = document.querySelector(`#ack-${id}`);
-    const alreadyDone = getCompleted().includes(btn.dataset.code);
-    btn.disabled = alreadyDone || !hasProfile() || !ack?.checked;
+async function loadMyProgress() {
+  completedByVideo = new Map();
+  if (!currentEmployee?.id) return;
+  const { data, error } = await client
+    .from('ehs_video_views')
+    .select('video_id, video_code, completed, watched_percent, completed_at, signature_ack')
+    .eq('employee_id', currentEmployee.id);
+  if (error) return;
+  (data || []).forEach(row => {
+    const key = row.video_id || row.video_code;
+    completedByVideo.set(key, row);
   });
 }
 
-function renderVideos() {
-  els.list.innerHTML = videos.map(video => {
-    const id = safeId(video.code);
-    const done = getCompleted().includes(video.code);
-    return `
-      <article class="video-card" id="${id}">
-        <div class="video-header">
-          <div>
-            <h3>${video.title}</h3>
-            <p>${video.day}. Al finalizar, registre el visto digital y firme RH-F-05.</p>
-          </div>
-          <span class="video-code">${video.code}</span>
-        </div>
-        <div class="video-box">
-          <video controls playsinline preload="metadata">
-            <source src="${encodeURI(video.file)}" type="video/mp4">
-            Su navegador no puede reproducir este video.
-          </video>
-          <a class="open-video" href="${encodeURI(video.file)}" target="_blank" rel="noopener">Abrir video en una pestaña nueva</a>
-        </div>
-        <div class="video-actions">
-          <label class="ack">
-            <input id="ack-${id}" type="checkbox" ${done ? "checked" : ""}>
-            Confirmo que vi este video y entiendo que debo firmar la hoja física RH-F-05 correspondiente a este tema.
-          </label>
-          <button class="complete-btn" data-code="${video.code}">${done ? "Registrado como visto" : "Registrar como visto"}</button>
-          <div class="saved" id="saved-${id}" ${done ? "style='display:block'" : ""}>Registro guardado.</div>
-        </div>
-      </article>`;
-  }).join("");
-
-  document.querySelectorAll(".ack input").forEach(input => input.addEventListener("change", updateButtons));
-  document.querySelectorAll(".complete-btn").forEach(btn => btn.addEventListener("click", handleComplete));
-  updateButtons();
-}
-
-async function handleComplete(event) {
-  const btn = event.currentTarget;
-  const video = videos.find(v => v.code === btn.dataset.code);
-  const id = safeId(video.code);
-  const ack = document.querySelector(`#ack-${id}`);
-
-  if (!hasProfile()) {
-    alert("Primero escriba su nombre y cédula/número de empleado, y presione Guardar mis datos.");
-    return;
-  }
-  if (!ack.checked) {
-    alert("Debe confirmar que vio el video y que firmará RH-F-05.");
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = "Guardando...";
-
+async function markCompleted(video, watchedPercent = 100) {
+  if (!currentEmployee?.id) throw new Error('Debe registrar sus datos primero.');
   const payload = {
-    employee_name: els.employeeName.value.trim(),
-    employee_id: els.employeeId.value.trim(),
-    project_site: els.site.value.trim(),
+    employee_id: currentEmployee.id,
+    video_id: video.id || null,
     video_code: video.code,
-    video_title: video.title,
-    viewed: true,
-    confirmed_signature_required: true
+    watched_percent: Math.max(95, Math.round(watchedPercent)),
+    completed: true,
+    signature_ack: true,
+    completed_at: new Date().toISOString(),
   };
-
-  const { error } = await sb.from("ehs_video_views").insert(payload);
-
-  if (error) {
-    btn.disabled = false;
-    btn.textContent = "Registrar como visto";
-    alert("No se pudo enviar el registro a Supabase. Error: " + error.message);
-    return;
-  }
-
-  setCompleted(video.code);
-  btn.textContent = "Registrado como visto";
-  document.getElementById(`saved-${id}`).style.display = "block";
+  const { error } = await client
+    .from('ehs_video_views')
+    .upsert(payload, { onConflict: video.id ? 'employee_id,video_id' : 'employee_id,video_code' });
+  if (error) throw error;
+  completedByVideo.set(video.id || video.code, payload);
+  renderVideos();
+  updateProgress();
 }
 
-els.saveProfile.addEventListener("click", saveProfile);
-[els.employeeName, els.employeeId, els.site].forEach(input => input.addEventListener("input", updateButtons));
+function showDashboard() {
+  qs('loginPanel').classList.add('hidden');
+  qs('dashboard').classList.remove('hidden');
+  qs('welcomeName').textContent = currentEmployee.full_name;
+  qs('welcomeMeta').textContent = `Cédula: ${currentEmployee.cedula} · Proyecto: ${currentEmployee.project_site}`;
+}
 
-loadProfile();
-renderVideos();
-updateProgress();
+function updateProgress() {
+  const done = videos.filter(v => completedByVideo.has(v.id || v.code)).length;
+  const total = videos.length || 1;
+  const percent = (done / total) * 100;
+  qs('progressText').textContent = `${done} de ${videos.length} completados`;
+  qs('progressPercent').textContent = pct(percent);
+  qs('progressFill').style.width = `${percent}%`;
+}
+
+function renderVideos() {
+  const grid = qs('videoGrid');
+  grid.innerHTML = '';
+  videos.forEach((video) => {
+    const key = video.id || video.code;
+    const done = completedByVideo.get(key);
+    const card = document.createElement('article');
+    card.className = 'card video-card';
+
+    const sources = videoSources(video);
+    const sourcesHtml = sources.map(src => `<source src="${src}" type="video/mp4">`).join('');
+    const firstSource = sources[0] || '#';
+
+    card.innerHTML = `
+      <div class="video-header">
+        <div>
+          <span class="video-code">${video.code}</span>
+          <h3>${video.title}</h3>
+          <p class="small-note">Categoría: ${video.category || 'EHS'}</p>
+        </div>
+        <span class="status ${done ? 'done' : ''}">${done ? 'Completado' : 'Pendiente'}</span>
+      </div>
+      <div class="video-wrap">
+        <video preload="metadata" controls playsinline>${sourcesHtml}Su navegador no puede reproducir este video.</video>
+      </div>
+      <div class="video-actions">
+        <a class="secondary-btn" href="${firstSource}" target="_blank" rel="noopener">Abrir video</a>
+        <button class="primary-btn complete-btn" ${done ? '' : 'disabled'}>${done ? 'Completado registrado' : 'Complete el video para registrar'}</button>
+      </div>
+      <p class="small-note">Al completar este video, debe firmar la hoja RH-F-05 correspondiente.</p>
+    `;
+
+    const videoEl = card.querySelector('video');
+    const completeBtn = card.querySelector('.complete-btn');
+    let bestProgress = done ? 100 : 0;
+
+    function enableButton() {
+      completeBtn.disabled = false;
+      if (!done) completeBtn.textContent = 'Registrar video visto';
+    }
+    videoEl.addEventListener('timeupdate', () => {
+      if (videoEl.duration) {
+        bestProgress = Math.max(bestProgress, (videoEl.currentTime / videoEl.duration) * 100);
+        if (bestProgress >= 95) enableButton();
+      }
+    });
+    videoEl.addEventListener('ended', () => { bestProgress = 100; enableButton(); });
+    completeBtn.addEventListener('click', async () => {
+      completeBtn.disabled = true;
+      completeBtn.textContent = 'Guardando...';
+      try { await markCompleted(video, bestProgress); }
+      catch (err) { alert(`No se pudo guardar: ${err.message}`); completeBtn.disabled = false; }
+    });
+    grid.appendChild(card);
+  });
+}
+
+async function initDashboard() {
+  videos = await loadVideos();
+  showDashboard();
+  await loadMyProgress();
+  renderVideos();
+  updateProgress();
+}
+
+qs('employeeForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const btn = event.target.querySelector('button');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+  try {
+    currentEmployee = await upsertEmployee({
+      full_name: qs('employeeName').value,
+      cedula: qs('employeeCedula').value,
+      project_site: qs('employeeProject').value,
+    });
+    saveEmployeeLocal(currentEmployee);
+    await initDashboard();
+  } catch (err) {
+    alert(`No se pudo iniciar: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Iniciar capacitación';
+  }
+});
+
+qs('changeUserBtn').addEventListener('click', () => {
+  localStorage.removeItem('sbm_ehs_employee');
+  location.reload();
+});
+
+async function loadAdminRows() {
+  const { data, error } = await client
+    .from('ehs_video_views')
+    .select('completed_at, watched_percent, signature_ack, video_code, ehs_employees(full_name, cedula, project_site), ehs_training_videos(title)')
+    .order('completed_at', { ascending: false })
+    .limit(1000);
+  if (error) { alert(`No se pudo cargar el panel: ${error.message}`); return; }
+  adminRows = data || [];
+  renderAdminRows();
+}
+function renderAdminRows() {
+  const filter = normalize(qs('adminFilter').value).toLowerCase();
+  const tbody = qs('adminTableBody');
+  tbody.innerHTML = '';
+  adminRows
+    .filter(row => JSON.stringify(row).toLowerCase().includes(filter))
+    .forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.completed_at ? new Date(row.completed_at).toLocaleString('es-CR') : ''}</td>
+        <td>${row.ehs_employees?.full_name || ''}</td>
+        <td>${row.ehs_employees?.cedula || ''}</td>
+        <td>${row.ehs_employees?.project_site || ''}</td>
+        <td>${row.video_code} · ${row.ehs_training_videos?.title || ''}</td>
+        <td>${row.watched_percent || 0}%</td>
+        <td>${row.signature_ack ? 'Pendiente de firma física' : ''}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+}
+function exportCsv() {
+  const rows = [['Fecha','Nombre','Cedula','Proyecto','Video','Avance','Firma']];
+  adminRows.forEach(row => rows.push([
+    row.completed_at ? new Date(row.completed_at).toLocaleString('es-CR') : '',
+    row.ehs_employees?.full_name || '',
+    row.ehs_employees?.cedula || '',
+    row.ehs_employees?.project_site || '',
+    `${row.video_code} ${row.ehs_training_videos?.title || ''}`,
+    `${row.watched_percent || 0}%`,
+    row.signature_ack ? 'Pendiente firma RH-F-05' : ''
+  ]));
+  const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `seguimiento_ehs_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+qs('refreshAdminBtn').addEventListener('click', loadAdminRows);
+qs('adminFilter').addEventListener('input', renderAdminRows);
+qs('exportCsvBtn').addEventListener('click', exportCsv);
+
+(async function boot() {
+  currentEmployee = getEmployeeLocal();
+  if (currentEmployee?.id) await initDashboard();
+})();
