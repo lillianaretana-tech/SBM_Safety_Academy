@@ -1,261 +1,548 @@
-const SUPABASE_URL = 'https://vgkyoyosjewdygxtnqvu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZna3lveW9zamV3ZHlneHRucXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NTAxNDAsImV4cCI6MjA5ODIyNjE0MH0.oDxSWg61UFLqMh2MeEW6yxarZAjobhEA6TWm0KS_7CA';
-const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL = "https://vgkyoyosjewdygxtnqvu.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZna3lveW9zamV3ZHlneHRucXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NTAxNDAsImV4cCI6MjA5ODIyNjE0MH0.oDxSWg61UFLqMh2MeEW6yxarZAjobhEA6TWm0KS_7CA";
+const ADMIN_PIN = "2026";
 
-const FALLBACK_VIDEOS = [
-  { code: 'EHS-I-05', title: 'Decapado y encerado de pisos', category: 'EHS', sort_order: 1, file_candidates: ['EHS-I-05- Decapado y encerado de pisos.mp4', 'EHS-I-05-Decapado-y-encerado-de-pisos.mp4', 'EHS-I-05- Decapado y encerado de pisos(1).mp4'] },
-  { code: 'EHS-I-12', title: 'Limpieza de Baños', category: 'EHS', sort_order: 2, file_candidates: ['EHS-I-12 - Limpieza de Baños.mp4', 'EHS-I-12-Limpieza-de-Banos.mp4'] },
-  { code: 'EHS-I-15', title: 'Limpieza de Pisos con Mopa', category: 'EHS', sort_order: 3, file_candidates: ['EHS-I-15 Limpieza de Pisos con Mopa.mp4', 'EHS-I-15-Limpieza-de-Pisos-con-Mopa.mp4'] },
-  { code: 'EHS-I-18', title: 'Colocación de barricadas', category: 'EHS', sort_order: 4, file_candidates: ['EHS-I-18-Colocacion de barricadas.mp4', 'EHS-I-18-Colocacion-de-barricadas.mp4'] },
-  { code: 'EHS-I-20', title: 'Recolección Segura de Basura', category: 'EHS', sort_order: 5, file_candidates: ['EHS-I-20-Recolección Segura de Basura.mp4', 'EHS-I-20-Recoleccion-Segura-de-Basura.mp4'] },
-  { code: 'EHS-I-23', title: 'Traslado de objetos', category: 'EHS', sort_order: 6, file_candidates: ['EHS-I-23-Traslado de objetos.mp4', 'EHS-I-23-Traslado-de-objetos.mp4'] },
-  { code: 'EHS-I-24', title: 'Uso de estaciones de dilución y piletas de lavado', category: 'EHS', sort_order: 7, file_candidates: ['EHS-1-24-Uso de estaciones de dilución y piletas de lavado.mp4', 'EHS-I-24-Uso-de-estaciones-de-dilucion-y-piletas-de-lavado.mp4'] },
-];
+const STORAGE_EMPLOYEE_KEY = "sbmSafetyAcademyEmployee";
+const STORAGE_PROGRESS_PREFIX = "sbmSafetyAcademyProgress:";
 
-let currentEmployee = null;
-let videos = [];
-let completedByVideo = new Map();
-let adminRows = [];
+const state = {
+  supabase: null,
+  employee: null,
+  videos: [],
+  views: new Map(),
+  localProgress: {},
+  adminRows: [],
+  adminAuthenticated: false
+};
 
-const qs = (id) => document.getElementById(id);
-const normalize = (value) => (value || '').toString().trim();
-const pct = (num) => `${Math.round(num || 0)}%`;
+const dom = {};
 
-function videoSources(video) {
-  const list = Array.isArray(video.file_candidates) && video.file_candidates.length ? video.file_candidates : [video.video_file].filter(Boolean);
-  return [...new Set(list.filter(Boolean))].map((file) => `videos/${file}`);
+document.addEventListener("DOMContentLoaded", () => {
+  cacheDom();
+  bindEvents();
+  boot();
+});
+
+function cacheDom() {
+  Object.assign(dom, {
+    appAlert: document.getElementById("appAlert"),
+    employeeForm: document.getElementById("employeeForm"),
+    fullName: document.getElementById("fullName"),
+    cedula: document.getElementById("cedula"),
+    projectSite: document.getElementById("projectSite"),
+    sessionBadge: document.getElementById("sessionBadge"),
+    progressSummary: document.getElementById("progressSummary"),
+    progressBar: document.getElementById("progressBar"),
+    progressPercent: document.getElementById("progressPercent"),
+    videoList: document.getElementById("videoList"),
+    emptyState: document.getElementById("emptyState"),
+    reloadBtn: document.getElementById("reloadBtn"),
+    adminOpenBtn: document.getElementById("adminOpenBtn"),
+    adminModal: document.getElementById("adminModal"),
+    adminCloseBtn: document.getElementById("adminCloseBtn"),
+    adminPinForm: document.getElementById("adminPinForm"),
+    adminPin: document.getElementById("adminPin"),
+    adminContent: document.getElementById("adminContent"),
+    filterPerson: document.getElementById("filterPerson"),
+    filterProject: document.getElementById("filterProject"),
+    filterVideo: document.getElementById("filterVideo"),
+    adminRows: document.getElementById("adminRows"),
+    adminEmpty: document.getElementById("adminEmpty"),
+    exportCsvBtn: document.getElementById("exportCsvBtn")
+  });
 }
 
-function saveEmployeeLocal(employee) {
-  localStorage.setItem('sbm_ehs_employee', JSON.stringify(employee));
-}
-function getEmployeeLocal() {
-  try { return JSON.parse(localStorage.getItem('sbm_ehs_employee') || 'null'); } catch { return null; }
+function bindEvents() {
+  dom.employeeForm.addEventListener("submit", saveEmployee);
+  dom.reloadBtn.addEventListener("click", refreshAll);
+  dom.adminOpenBtn.addEventListener("click", openAdmin);
+  dom.adminCloseBtn.addEventListener("click", closeAdmin);
+  dom.adminModal.addEventListener("click", (event) => {
+    if (event.target === dom.adminModal) closeAdmin();
+  });
+  dom.adminPinForm.addEventListener("submit", unlockAdmin);
+  [dom.filterPerson, dom.filterProject, dom.filterVideo].forEach((control) => {
+    control.addEventListener("input", renderAdminRows);
+    control.addEventListener("change", renderAdminRows);
+  });
+  dom.exportCsvBtn.addEventListener("click", exportCsv);
 }
 
-async function upsertEmployee(form) {
-  const cedula = normalize(form.cedula);
+async function boot() {
+  initSupabase();
+  restoreEmployee();
+  await refreshAll();
+}
+
+function initSupabase() {
+  if (!window.supabase || !window.supabase.createClient) {
+    showAlert("No se pudo cargar Supabase JS. Revise la conexión a internet o el CDN configurado.");
+    return;
+  }
+
+  if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("PEGA_AQUI")) {
+    showAlert("Falta configurar SUPABASE_ANON_KEY en app.js. Pegue la anon key del proyecto Supabase para activar la conexión.");
+    return;
+  }
+
+  state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+function restoreEmployee() {
+  const saved = safeJsonParse(localStorage.getItem(STORAGE_EMPLOYEE_KEY), null);
+  if (!saved || !saved.id) return;
+
+  state.employee = saved;
+  dom.fullName.value = saved.full_name || "";
+  dom.cedula.value = saved.cedula || "";
+  dom.projectSite.value = saved.project_site || "";
+  loadLocalProgress();
+  updateSessionBadge();
+}
+
+async function refreshAll() {
+  clearAlert();
+  await loadVideos();
+  if (state.employee) {
+    await loadViews();
+  }
+  renderVideos();
+  renderProgress();
+}
+
+async function saveEmployee(event) {
+  event.preventDefault();
+  if (!requireSupabase()) return;
+
   const payload = {
-    full_name: normalize(form.full_name),
-    cedula,
-    project_site: normalize(form.project_site),
-    updated_at: new Date().toISOString(),
+    full_name: dom.fullName.value.trim(),
+    cedula: dom.cedula.value.trim(),
+    project_site: dom.projectSite.value.trim(),
+    updated_at: new Date().toISOString()
   };
-  const { data, error } = await client
-    .from('ehs_employees')
-    .upsert(payload, { onConflict: 'cedula' })
+
+  if (!payload.full_name || !payload.cedula || !payload.project_site) {
+    showAlert("Complete nombre, cédula y proyecto/site para continuar.");
+    return;
+  }
+
+  setFormBusy(true);
+  const { data, error } = await state.supabase
+    .from("ehs_employees")
+    .upsert(payload, { onConflict: "cedula" })
     .select()
     .single();
-  if (error) throw error;
-  return data;
+  setFormBusy(false);
+
+  if (error) {
+    showAlert(`No se pudo guardar el colaborador: ${error.message}`);
+    return;
+  }
+
+  state.employee = data;
+  localStorage.setItem(STORAGE_EMPLOYEE_KEY, JSON.stringify(data));
+  loadLocalProgress();
+  updateSessionBadge();
+  await loadViews();
+  renderVideos();
+  renderProgress();
 }
 
 async function loadVideos() {
-  const { data, error } = await client
-    .from('ehs_training_videos')
-    .select('*')
-    .eq('active', true)
-    .order('sort_order', { ascending: true });
-  if (error || !data || !data.length) return FALLBACK_VIDEOS;
-  return data;
+  state.videos = [];
+  if (!requireSupabase(false)) {
+    renderVideos();
+    return;
+  }
+
+  const { data, error } = await state.supabase
+    .from("ehs_training_videos")
+    .select("id, category_id, video_code, title, description, file_path, active, sort_order, ehs_training_categories(name)")
+    .eq("active", true)
+    .order("sort_order", { ascending: true })
+    .order("video_code", { ascending: true });
+
+  if (error) {
+    showAlert(`No se pudieron cargar los videos: ${error.message}`);
+    return;
+  }
+
+  state.videos = Array.isArray(data) ? data : [];
 }
 
-async function loadMyProgress() {
-  completedByVideo = new Map();
-  if (!currentEmployee?.id) return;
-  const { data, error } = await client
-    .from('ehs_video_views')
-    .select('video_id, video_code, completed, watched_percent, completed_at, signature_ack')
-    .eq('employee_id', currentEmployee.id);
-  if (error) return;
-  (data || []).forEach(row => {
-    const key = row.video_id || row.video_code;
-    completedByVideo.set(key, row);
-  });
-}
+async function loadViews() {
+  state.views = new Map();
+  if (!state.employee || !requireSupabase(false)) return;
 
-async function markCompleted(video, watchedPercent = 100) {
-  if (!currentEmployee?.id) throw new Error('Debe registrar sus datos primero.');
-  const payload = {
-    employee_id: currentEmployee.id,
-    video_id: video.id || null,
-    video_code: video.code,
-    watched_percent: Math.max(95, Math.round(watchedPercent)),
-    completed: true,
-    signature_ack: true,
-    completed_at: new Date().toISOString(),
-  };
-  const { error } = await client
-    .from('ehs_video_views')
-    .upsert(payload, { onConflict: video.id ? 'employee_id,video_id' : 'employee_id,video_code' });
-  if (error) throw error;
-  completedByVideo.set(video.id || video.code, payload);
-  renderVideos();
-  updateProgress();
-}
+  const { data, error } = await state.supabase
+    .from("ehs_video_views")
+    .select("*")
+    .eq("employee_id", state.employee.id);
 
-function showDashboard() {
-  qs('loginPanel').classList.add('hidden');
-  qs('dashboard').classList.remove('hidden');
-  qs('welcomeName').textContent = currentEmployee.full_name;
-  qs('welcomeMeta').textContent = `Cédula: ${currentEmployee.cedula} · Proyecto: ${currentEmployee.project_site}`;
-}
+  if (error) {
+    showAlert(`No se pudo cargar el progreso personal: ${error.message}`);
+    return;
+  }
 
-function updateProgress() {
-  const done = videos.filter(v => completedByVideo.has(v.id || v.code)).length;
-  const total = videos.length || 1;
-  const percent = (done / total) * 100;
-  qs('progressText').textContent = `${done} de ${videos.length} completados`;
-  qs('progressPercent').textContent = pct(percent);
-  qs('progressFill').style.width = `${percent}%`;
+  (data || []).forEach((view) => state.views.set(view.video_id, view));
 }
 
 function renderVideos() {
-  const grid = qs('videoGrid');
-  grid.innerHTML = '';
-  videos.forEach((video) => {
-    const key = video.id || video.code;
-    const done = completedByVideo.get(key);
-    const card = document.createElement('article');
-    card.className = 'card video-card';
+  dom.videoList.innerHTML = "";
+  dom.emptyState.classList.toggle("hidden", state.videos.length > 0);
 
-    const sources = videoSources(video);
-    const sourcesHtml = sources.map(src => `<source src="${src}" type="video/mp4">`).join('');
-    const firstSource = sources[0] || '#';
-
+  state.videos.forEach((video) => {
+    const view = state.views.get(video.id);
+    const progress = getVideoProgress(video.id, view);
+    const status = getStatus(progress, view);
+    const card = document.createElement("article");
+    card.className = "video-card";
     card.innerHTML = `
-      <div class="video-header">
-        <div>
-          <span class="video-code">${video.code}</span>
-          <h3>${video.title}</h3>
-          <p class="small-note">Categoría: ${video.category || 'EHS'}</p>
+      <div class="video-body">
+        <div class="video-meta">
+          <span class="category-chip">${escapeHtml(video.ehs_training_categories?.name || "EHS")}</span>
+          <span class="code-chip">${escapeHtml(getVideoCode(video))}</span>
+          <span class="status-pill ${status.className}">${status.label}</span>
         </div>
-        <span class="status ${done ? 'done' : ''}">${done ? 'Completado' : 'Pendiente'}</span>
+        <div>
+          <h3>${escapeHtml(video.title || "Capacitación sin título")}</h3>
+          <p>${escapeHtml(video.description || "Sin descripción.")}</p>
+        </div>
+        <video class="training-video" controls preload="metadata" playsinline src="${escapeAttribute(video.file_path || "")}"></video>
+        <div class="video-actions">
+          <button class="primary-btn complete-btn" type="button" ${isCompleteButtonEnabled(progress, view) ? "" : "disabled"}>
+            ${view?.completed ? "Completado" : "Marcar como completado"}
+          </button>
+          <div>
+            <p class="muted">Avance visto: <strong>${Math.round(progress)}%</strong>. Debe llegar al 95% para completar.</p>
+            <a class="video-link" href="${escapeAttribute(video.file_path || "")}" target="_blank" rel="noopener">Abrir video en pestaña nueva</a>
+          </div>
+        </div>
       </div>
-      <div class="video-wrap">
-        <video preload="metadata" controls playsinline>${sourcesHtml}Su navegador no puede reproducir este video.</video>
-      </div>
-      <div class="video-actions">
-        <a class="secondary-btn" href="${firstSource}" target="_blank" rel="noopener">Abrir video</a>
-        <button class="primary-btn complete-btn" ${done ? '' : 'disabled'}>${done ? 'Completado registrado' : 'Complete el video para registrar'}</button>
-      </div>
-      <p class="small-note">Al completar este video, debe firmar la hoja RH-F-05 correspondiente.</p>
     `;
 
-    const videoEl = card.querySelector('video');
-    const completeBtn = card.querySelector('.complete-btn');
-    let bestProgress = done ? 100 : 0;
-
-    function enableButton() {
-      completeBtn.disabled = false;
-      if (!done) completeBtn.textContent = 'Registrar video visto';
-    }
-    videoEl.addEventListener('timeupdate', () => {
-      if (videoEl.duration) {
-        bestProgress = Math.max(bestProgress, (videoEl.currentTime / videoEl.duration) * 100);
-        if (bestProgress >= 95) enableButton();
-      }
-    });
-    videoEl.addEventListener('ended', () => { bestProgress = 100; enableButton(); });
-    completeBtn.addEventListener('click', async () => {
-      completeBtn.disabled = true;
-      completeBtn.textContent = 'Guardando...';
-      try { await markCompleted(video, bestProgress); }
-      catch (err) { alert(`No se pudo guardar: ${err.message}`); completeBtn.disabled = false; }
-    });
-    grid.appendChild(card);
+    const videoEl = card.querySelector("video");
+    const completeBtn = card.querySelector(".complete-btn");
+    videoEl.addEventListener("play", () => startVideo(video.id));
+    videoEl.addEventListener("timeupdate", () => handleVideoProgress(video.id, videoEl, card));
+    videoEl.addEventListener("ended", () => handleVideoProgress(video.id, videoEl, card, true));
+    videoEl.addEventListener("error", () => showAlert(`El video ${getVideoCode(video) || video.title} no se pudo reproducir. Use el enlace "Abrir video en pestaña nueva" o revise la ruta en Supabase.`));
+    completeBtn.addEventListener("click", () => completeVideo(video.id, card));
+    dom.videoList.appendChild(card);
   });
 }
 
-async function initDashboard() {
-  videos = await loadVideos();
-  showDashboard();
-  await loadMyProgress();
-  renderVideos();
-  updateProgress();
+async function startVideo(videoId) {
+  if (!state.employee || !requireSupabase(false)) return;
+  if (state.views.has(videoId)) return;
+
+  const payload = {
+    employee_id: state.employee.id,
+    video_id: videoId,
+    started_at: new Date().toISOString(),
+    progress_percent: getVideoProgress(videoId),
+    completed: false,
+    signature_required: true,
+    signature_reminder_ack: false
+  };
+
+  const { data, error } = await state.supabase
+    .from("ehs_video_views")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (!error && data) state.views.set(videoId, data);
 }
 
-qs('employeeForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const btn = event.target.querySelector('button');
-  btn.disabled = true;
-  btn.textContent = 'Guardando...';
-  try {
-    currentEmployee = await upsertEmployee({
-      full_name: qs('employeeName').value,
-      cedula: qs('employeeCedula').value,
-      project_site: qs('employeeProject').value,
-    });
-    saveEmployeeLocal(currentEmployee);
-    await initDashboard();
-  } catch (err) {
-    alert(`No se pudo iniciar: ${err.message}`);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Iniciar capacitación';
+function handleVideoProgress(videoId, videoEl, card, forceComplete = false) {
+  if (!videoEl.duration || Number.isNaN(videoEl.duration)) return;
+  const percent = Math.min(100, (videoEl.currentTime / videoEl.duration) * 100);
+  if (!state.localProgress[videoId] || percent > state.localProgress[videoId]) {
+    state.localProgress[videoId] = forceComplete ? 100 : percent;
+    saveLocalProgress();
   }
-});
+  updateCardProgress(videoId, card);
+  renderProgress();
+}
 
-qs('changeUserBtn').addEventListener('click', () => {
-  localStorage.removeItem('sbm_ehs_employee');
-  location.reload();
-});
+function updateCardProgress(videoId, card) {
+  const view = state.views.get(videoId);
+  const progress = getVideoProgress(videoId, view);
+  const status = getStatus(progress, view);
+  const statusPill = card.querySelector(".status-pill");
+  const completeBtn = card.querySelector(".complete-btn");
+  const progressText = card.querySelector(".muted strong");
+
+  statusPill.className = `status-pill ${status.className}`;
+  statusPill.textContent = status.label;
+  progressText.textContent = `${Math.round(progress)}%`;
+  completeBtn.disabled = !isCompleteButtonEnabled(progress, view);
+  completeBtn.textContent = view?.completed ? "Completado" : "Marcar como completado";
+}
+
+async function completeVideo(videoId, card) {
+  if (!state.employee) {
+    showAlert("Primero registre el colaborador para guardar el avance personal.");
+    return;
+  }
+  if (!requireSupabase()) return;
+
+  const progress = Math.max(95, getVideoProgress(videoId));
+  const existing = state.views.get(videoId);
+  const payload = {
+    employee_id: state.employee.id,
+    video_id: videoId,
+    started_at: existing?.started_at || new Date().toISOString(),
+    completed_at: new Date().toISOString(),
+    progress_percent: progress,
+    completed: true,
+    signature_required: true,
+    signature_reminder_ack: true,
+    updated_at: new Date().toISOString()
+  };
+
+  const query = existing
+    ? state.supabase.from("ehs_video_views").update(payload).eq("id", existing.id)
+    : state.supabase.from("ehs_video_views").insert(payload);
+
+  const { data, error } = await query.select().single();
+  if (error) {
+    showAlert(`No se pudo guardar la capacitación completada: ${error.message}`);
+    return;
+  }
+
+  state.views.set(videoId, data);
+  state.localProgress[videoId] = Math.max(state.localProgress[videoId] || 0, progress);
+  saveLocalProgress();
+  updateCardProgress(videoId, card);
+  renderProgress();
+}
+
+function renderProgress() {
+  const total = state.videos.length;
+  const completed = state.videos.filter((video) => state.views.get(video.id)?.completed).length;
+  const percent = total ? Math.round((completed / total) * 100) : 0;
+  dom.progressSummary.textContent = `${completed} de ${total} completados`;
+  dom.progressBar.style.width = `${percent}%`;
+  dom.progressPercent.textContent = `${percent}%`;
+}
+
+function getVideoProgress(videoId, view = state.views.get(videoId)) {
+  return Math.max(Number(view?.progress_percent || 0), Number(state.localProgress[videoId] || 0));
+}
+
+function getVideoCode(video) {
+  return video?.video_code || video?.code || "";
+}
+
+function getStatus(progress, view) {
+  if (view?.completed) return { label: "Completado", className: "completed" };
+  if (progress > 0) return { label: "En progreso", className: "in-progress" };
+  return { label: "Pendiente", className: "pending" };
+}
+
+function canComplete(progress, view) {
+  return Boolean(state.employee && (view?.completed || progress >= 95));
+}
+
+function isCompleteButtonEnabled(progress, view) {
+  return Boolean(!view?.completed && canComplete(progress, view));
+}
+
+function loadLocalProgress() {
+  state.localProgress = safeJsonParse(localStorage.getItem(progressStorageKey()), {});
+}
+
+function saveLocalProgress() {
+  if (!state.employee) return;
+  localStorage.setItem(progressStorageKey(), JSON.stringify(state.localProgress));
+}
+
+function progressStorageKey() {
+  return `${STORAGE_PROGRESS_PREFIX}${state.employee?.cedula || "anon"}`;
+}
+
+function updateSessionBadge() {
+  if (!state.employee) return;
+  dom.sessionBadge.textContent = `Registrado: ${state.employee.full_name}`;
+  dom.sessionBadge.className = "status-pill completed";
+}
+
+async function openAdmin() {
+  dom.adminModal.classList.remove("hidden");
+  dom.adminPin.focus();
+  if (state.adminAuthenticated) await loadAdminRows();
+}
+
+function closeAdmin() {
+  dom.adminModal.classList.add("hidden");
+}
+
+async function unlockAdmin(event) {
+  event.preventDefault();
+  if (dom.adminPin.value !== ADMIN_PIN) {
+    showAlert("Clave de administrador incorrecta.");
+    return;
+  }
+  state.adminAuthenticated = true;
+  dom.adminPinForm.classList.add("hidden");
+  dom.adminContent.classList.remove("hidden");
+  await loadAdminRows();
+}
 
 async function loadAdminRows() {
-  const { data, error } = await client
-    .from('ehs_video_views')
-    .select('completed_at, watched_percent, signature_ack, video_code, ehs_employees(full_name, cedula, project_site), ehs_training_videos(title)')
-    .order('completed_at', { ascending: false })
-    .limit(1000);
-  if (error) { alert(`No se pudo cargar el panel: ${error.message}`); return; }
-  adminRows = data || [];
+  if (!requireSupabase()) return;
+  const { data, error } = await state.supabase
+    .from("ehs_video_views")
+    .select("completed_at, progress_percent, completed, ehs_employees(full_name, cedula, project_site), ehs_training_videos(id, video_code, title)")
+    .eq("completed", true)
+    .order("completed_at", { ascending: false });
+
+  if (error) {
+    showAlert(`No se pudieron cargar los registros del administrador: ${error.message}`);
+    return;
+  }
+
+  state.adminRows = data || [];
+  populateVideoFilter();
   renderAdminRows();
 }
-function renderAdminRows() {
-  const filter = normalize(qs('adminFilter').value).toLowerCase();
-  const tbody = qs('adminTableBody');
-  tbody.innerHTML = '';
-  adminRows
-    .filter(row => JSON.stringify(row).toLowerCase().includes(filter))
-    .forEach(row => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${row.completed_at ? new Date(row.completed_at).toLocaleString('es-CR') : ''}</td>
-        <td>${row.ehs_employees?.full_name || ''}</td>
-        <td>${row.ehs_employees?.cedula || ''}</td>
-        <td>${row.ehs_employees?.project_site || ''}</td>
-        <td>${row.video_code} · ${row.ehs_training_videos?.title || ''}</td>
-        <td>${row.watched_percent || 0}%</td>
-        <td>${row.signature_ack ? 'Pendiente de firma física' : ''}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+
+function populateVideoFilter() {
+  const current = dom.filterVideo.value;
+  const options = new Map();
+  state.adminRows.forEach((row) => {
+    const video = row.ehs_training_videos;
+    if (video?.id) options.set(video.id, `${getVideoCode(video)} - ${video.title}`);
+  });
+
+  dom.filterVideo.innerHTML = '<option value="">Todos los videos</option>';
+  [...options.entries()].sort((a, b) => a[1].localeCompare(b[1])).forEach(([id, label]) => {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = label;
+    dom.filterVideo.appendChild(option);
+  });
+  dom.filterVideo.value = current;
 }
+
+function getFilteredAdminRows() {
+  const person = normalize(dom.filterPerson.value);
+  const project = normalize(dom.filterProject.value);
+  const videoId = dom.filterVideo.value;
+
+  return state.adminRows.filter((row) => {
+    const employee = row.ehs_employees || {};
+    const video = row.ehs_training_videos || {};
+    const personText = normalize(`${employee.full_name || ""} ${employee.cedula || ""}`);
+    const projectText = normalize(employee.project_site || "");
+    return (!person || personText.includes(person))
+      && (!project || projectText.includes(project))
+      && (!videoId || video.id === videoId);
+  });
+}
+
+function renderAdminRows() {
+  const rows = getFilteredAdminRows();
+  dom.adminRows.innerHTML = "";
+  rows.forEach((row) => {
+    const employee = row.ehs_employees || {};
+    const video = row.ehs_training_videos || {};
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(employee.full_name || "")}</td>
+      <td>${escapeHtml(employee.cedula || "")}</td>
+      <td>${escapeHtml(employee.project_site || "")}</td>
+      <td>${escapeHtml(`${getVideoCode(video)} - ${video.title || ""}`)}</td>
+      <td>${escapeHtml(formatDate(row.completed_at))}</td>
+      <td>${Math.round(Number(row.progress_percent || 0))}%</td>
+    `;
+    dom.adminRows.appendChild(tr);
+  });
+  dom.adminEmpty.classList.toggle("hidden", rows.length > 0);
+}
+
 function exportCsv() {
-  const rows = [['Fecha','Nombre','Cedula','Proyecto','Video','Avance','Firma']];
-  adminRows.forEach(row => rows.push([
-    row.completed_at ? new Date(row.completed_at).toLocaleString('es-CR') : '',
-    row.ehs_employees?.full_name || '',
-    row.ehs_employees?.cedula || '',
-    row.ehs_employees?.project_site || '',
-    `${row.video_code} ${row.ehs_training_videos?.title || ''}`,
-    `${row.watched_percent || 0}%`,
-    row.signature_ack ? 'Pendiente firma RH-F-05' : ''
-  ]));
-  const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const rows = getFilteredAdminRows();
+  const header = ["colaborador", "cedula", "proyecto", "video", "fecha_completado", "porcentaje"];
+  const body = rows.map((row) => {
+    const employee = row.ehs_employees || {};
+    const video = row.ehs_training_videos || {};
+    return [
+      employee.full_name || "",
+      employee.cedula || "",
+      employee.project_site || "",
+      `${getVideoCode(video)} - ${video.title || ""}`,
+      formatDate(row.completed_at),
+      Math.round(Number(row.progress_percent || 0))
+    ];
+  });
+  const csv = [header, ...body].map((line) => line.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `seguimiento_ehs_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `sbm-safety-academy-registros-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
   URL.revokeObjectURL(url);
 }
-qs('refreshAdminBtn').addEventListener('click', loadAdminRows);
-qs('adminFilter').addEventListener('input', renderAdminRows);
-qs('exportCsvBtn').addEventListener('click', exportCsv);
 
-(async function boot() {
-  currentEmployee = getEmployeeLocal();
-  if (currentEmployee?.id) await initDashboard();
-})();
+function setFormBusy(isBusy) {
+  dom.employeeForm.querySelectorAll("input, button").forEach((el) => {
+    el.disabled = isBusy;
+  });
+}
+
+function requireSupabase(show = true) {
+  const ready = Boolean(state.supabase);
+  if (!ready && show) showAlert("Supabase no está disponible. Revise SUPABASE_ANON_KEY en app.js y la conexión de red.");
+  return ready;
+}
+
+function showAlert(message) {
+  dom.appAlert.textContent = message;
+  dom.appAlert.classList.remove("hidden");
+}
+
+function clearAlert() {
+  dom.appAlert.textContent = "";
+  dom.appAlert.classList.add("hidden");
+}
+
+function safeJsonParse(value, fallback) {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalize(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("es-GT", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
+function csvCell(value) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value);
+}

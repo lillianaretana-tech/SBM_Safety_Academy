@@ -1,111 +1,146 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SBM Safety Academy</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
-  <header class="hero">
-    <div class="hero__badge">SBM Microlearning</div>
-    <h1>SBM Safety Academy</h1>
-    <p>Serie de microcapacitaciones EHS. Vea cada video completo, registre su avance y recuerde firmar el formato físico RH-F-05 correspondiente.</p>
+  <header class="app-header">
+    <div class="shell header-grid">
+      <div>
+        <p class="eyebrow">Microcapacitaciones EHS</p>
+        <h1>SBM Safety Academy</h1>
+        <p class="subtitle">Capacitaciones breves para reforzar prácticas seguras en operación.</p>
+      </div>
+      <button id="adminOpenBtn" class="secondary-btn" type="button">Panel administrador</button>
+    </div>
   </header>
 
-  <main class="app-shell">
-    <section id="loginPanel" class="card login-card">
-      <h2>Registro del colaborador</h2>
-      <p class="muted">Ingrese sus datos antes de iniciar. El proyecto puede escribirse completo o parcial.</p>
+  <main class="shell main-layout">
+    <section id="appAlert" class="alert hidden" role="alert"></section>
+
+    <section class="panel register-panel" aria-labelledby="registroTitulo">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Ingreso</p>
+          <h2 id="registroTitulo">Registro del colaborador</h2>
+        </div>
+        <span id="sessionBadge" class="status-pill pending">Sin registro</span>
+      </div>
+
       <form id="employeeForm" class="form-grid">
         <label>
           Nombre completo
-          <input id="employeeName" type="text" placeholder="Ej. María Rodríguez" required />
+          <input id="fullName" name="fullName" type="text" autocomplete="name" required>
         </label>
         <label>
           Cédula
-          <input id="employeeCedula" type="text" placeholder="Ej. 1-1111-1111" required />
+          <input id="cedula" name="cedula" type="text" inputmode="text" autocomplete="off" required>
         </label>
-        <label>
-          Proyecto / Site
-          <input id="employeeProject" type="text" placeholder="Ej. Bayer, DXC, McKinsey, Uber..." required />
+        <label class="wide-field">
+          Proyecto / site
+          <input id="projectSite" name="projectSite" type="text" placeholder="Ej. Hospital Central, Torre Norte" required>
         </label>
-        <button type="submit" class="primary-btn">Iniciar capacitación</button>
+        <button class="primary-btn wide-field" type="submit">Guardar y ver capacitaciones</button>
       </form>
     </section>
 
-    <section id="dashboard" class="hidden">
-      <div class="card profile-card">
-        <div>
-          <span class="eyebrow">Colaborador</span>
-          <h2 id="welcomeName">Bienvenido</h2>
-          <p id="welcomeMeta" class="muted"></p>
-        </div>
-        <button id="changeUserBtn" class="secondary-btn">Cambiar datos</button>
+    <section class="signature-banner" aria-label="Recordatorio de firma física">
+      <div>
+        <strong>El registro digital no sustituye la firma física.</strong>
+        <p>Debe firmar el formato RH-F-05 correspondiente a cada capacitación.</p>
       </div>
+      <a class="secondary-btn" href="docs/RH-F-05-Control-de-asistencia-a-capacitaciones.pdf" target="_blank" rel="noopener">Abrir RH-F-05</a>
+    </section>
 
-      <section class="card progress-card">
-        <div class="progress-top">
-          <div>
-            <span class="eyebrow">Progreso</span>
-            <h2 id="progressText">0 de 7 completados</h2>
-          </div>
-          <strong id="progressPercent">0%</strong>
+    <section class="panel progress-panel" aria-labelledby="progresoTitulo">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Avance personal</p>
+          <h2 id="progresoTitulo">Progreso general</h2>
         </div>
-        <div class="progress-bar"><span id="progressFill"></span></div>
-      </section>
+        <span id="progressSummary" class="progress-text">0 de 0 completados</span>
+      </div>
+      <div class="progress-track" aria-hidden="true">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <p id="progressPercent" class="muted">0%</p>
+    </section>
 
-      <section class="card instructions">
-        <h2>Plan sugerido</h2>
-        <p><strong>Ruta normal:</strong> ver videos lunes, miércoles y viernes si no hay capacitaciones 4insite programadas.</p>
-        <p><strong>Ruta acelerada:</strong> si no hay videos 4insite en la semana, ver un video por día de lunes a viernes hasta completar la serie.</p>
-        <p class="warning">El registro digital no sustituye la firma física. Debe firmarse una hoja RH-F-05 por cada video.</p>
-        <a class="doc-link" href="docs/RH-F-05-Control-de-asistencia-a-capacitaciones.pdf" target="_blank" rel="noopener">Abrir formato RH-F-05 PDF</a>
-      </section>
-
-      <section>
-        <div class="section-title">
-          <h2>Videos EHS</h2>
-          <p>El botón de completar se activa cuando el video llega al final o al menos al 95%.</p>
+    <section aria-labelledby="videosTitulo">
+      <div class="section-title video-heading">
+        <div>
+          <p class="eyebrow">Biblioteca</p>
+          <h2 id="videosTitulo">Capacitaciones disponibles</h2>
         </div>
-        <div id="videoGrid" class="video-grid"></div>
-      </section>
-
-      <section class="card admin-card">
-        <details>
-          <summary>Panel de seguimiento</summary>
-          <p class="muted">Filtre por nombre, cédula, proyecto o video. Este panel ayuda al seguimiento digital; la firma RH-F-05 sigue siendo el respaldo oficial.</p>
-          <div class="admin-actions">
-            <input id="adminFilter" type="search" placeholder="Filtrar por proyecto, persona, cédula o video..." />
-            <button id="refreshAdminBtn" class="secondary-btn">Actualizar</button>
-            <button id="exportCsvBtn" class="secondary-btn">Exportar CSV</button>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Nombre</th>
-                  <th>Cédula</th>
-                  <th>Proyecto</th>
-                  <th>Video</th>
-                  <th>Avance</th>
-                  <th>Firma</th>
-                </tr>
-              </thead>
-              <tbody id="adminTableBody"></tbody>
-            </table>
-          </div>
-        </details>
-      </section>
+        <button id="reloadBtn" class="ghost-btn" type="button">Actualizar</button>
+      </div>
+      <div id="videoList" class="video-list"></div>
+      <div id="emptyState" class="empty-state hidden">
+        No hay videos activos en Supabase. Verifique la tabla <strong>ehs_training_videos</strong> o ejecute el archivo SQL inicial.
+      </div>
     </section>
   </main>
 
-  <footer>
-    SBM Safety Academy · Control digital de microcapacitaciones EHS
-  </footer>
+  <div id="adminModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+    <div class="modal-panel">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Administración</p>
+          <h2 id="adminTitle">Registros completados</h2>
+        </div>
+        <button id="adminCloseBtn" class="icon-btn" type="button" aria-label="Cerrar panel">×</button>
+      </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js"></script>
+      <form id="adminPinForm" class="pin-form">
+        <label>
+          Clave temporal
+          <input id="adminPin" type="password" inputmode="numeric" autocomplete="off" required>
+        </label>
+        <button class="primary-btn" type="submit">Entrar</button>
+      </form>
+
+      <div id="adminContent" class="admin-content hidden">
+        <div class="filters">
+          <label>
+            Nombre o cédula
+            <input id="filterPerson" type="search" placeholder="Buscar colaborador">
+          </label>
+          <label>
+            Proyecto parcial
+            <input id="filterProject" type="search" placeholder="Ej. hospital">
+          </label>
+          <label>
+            Video
+            <select id="filterVideo">
+              <option value="">Todos los videos</option>
+            </select>
+          </label>
+          <button id="exportCsvBtn" class="secondary-btn" type="button">Exportar CSV</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Colaborador</th>
+                <th>Cédula</th>
+                <th>Proyecto</th>
+                <th>Video</th>
+                <th>Fecha completado</th>
+                <th>Porcentaje</th>
+              </tr>
+            </thead>
+            <tbody id="adminRows"></tbody>
+          </table>
+        </div>
+        <p id="adminEmpty" class="muted hidden">No hay registros con esos filtros.</p>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
