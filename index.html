@@ -11,19 +11,22 @@
 <body>
   <header class="app-header">
     <div class="shell header-grid">
-      <div>
+      <div class="brand-lockup">
+        <img class="brand-logo" src="assets/Logo_SBM.png" alt="SBM">
+        <div>
         <p class="eyebrow">Microcapacitaciones EHS</p>
         <h1>SBM Safety Academy</h1>
-        <p class="subtitle">Capacitaciones breves para reforzar prácticas seguras en operación.</p>
+        <p class="subtitle">LMS operativo para capacitaciones breves, avance personal y seguimiento RH-F-05.</p>
+        </div>
       </div>
       <button id="adminOpenBtn" class="secondary-btn" type="button">Panel administrador</button>
     </div>
   </header>
 
-  <main class="shell main-layout">
+  <main class="shell app-main">
     <section id="appAlert" class="alert hidden" role="alert"></section>
 
-    <section class="panel register-panel" aria-labelledby="registroTitulo">
+    <section id="registerPanel" class="panel register-panel" aria-labelledby="registroTitulo">
       <div class="section-title">
         <div>
           <p class="eyebrow">Ingreso</p>
@@ -38,51 +41,108 @@
           <input id="fullName" name="fullName" type="text" autocomplete="name" required>
         </label>
         <label>
-          Cédula
+          Cedula
           <input id="cedula" name="cedula" type="text" inputmode="text" autocomplete="off" required>
         </label>
-        <label class="wide-field">
+        <label>
           Proyecto / site
-          <input id="projectSite" name="projectSite" type="text" placeholder="Ej. Hospital Central, Torre Norte" required>
+          <input id="projectSite" name="projectSite" type="text" placeholder="Ej. Hospital Central" required>
         </label>
-        <button class="primary-btn wide-field" type="submit">Guardar y ver capacitaciones</button>
+        <button class="primary-btn" type="submit">Entrar al LMS</button>
       </form>
     </section>
 
-    <section class="signature-banner" aria-label="Recordatorio de firma física">
-      <div>
-        <strong>El registro digital no sustituye la firma física.</strong>
-        <p>Debe firmar el formato RH-F-05 correspondiente a cada capacitación.</p>
-      </div>
-      <a class="secondary-btn" href="docs/RH-F-05-Control-de-asistencia-a-capacitaciones.pdf" target="_blank" rel="noopener">Abrir RH-F-05</a>
-    </section>
-
-    <section class="panel progress-panel" aria-labelledby="progresoTitulo">
-      <div class="section-title">
-        <div>
-          <p class="eyebrow">Avance personal</p>
-          <h2 id="progresoTitulo">Progreso general</h2>
+    <section id="learnerArea" class="learner-area hidden">
+      <section class="panel dashboard-panel" aria-labelledby="dashboardTitle">
+        <div class="dashboard-head">
+          <div>
+            <p class="eyebrow">Dashboard</p>
+            <h2 id="dashboardTitle">Hola, <span id="learnerName">colaborador</span></h2>
+            <p id="learnerProject" class="muted">Proyecto: --</p>
+          </div>
+          <button id="changeUserBtn" class="ghost-btn" type="button">Cambiar usuario</button>
         </div>
-        <span id="progressSummary" class="progress-text">0 de 0 completados</span>
-      </div>
-      <div class="progress-track" aria-hidden="true">
-        <div id="progressBar" class="progress-bar"></div>
-      </div>
-      <p id="progressPercent" class="muted">0%</p>
-    </section>
 
-    <section aria-labelledby="videosTitulo">
-      <div class="section-title video-heading">
-        <div>
-          <p class="eyebrow">Biblioteca</p>
-          <h2 id="videosTitulo">Capacitaciones disponibles</h2>
+        <div class="metrics-grid">
+          <div class="metric">
+            <span id="metricPercent">0%</span>
+            <p>Progreso general</p>
+          </div>
+          <div class="metric">
+            <span id="metricCompleted">0 de 0</span>
+            <p>Capacitaciones completadas</p>
+          </div>
+          <div class="metric">
+            <span id="metricPending">0</span>
+            <p>Pendientes</p>
+          </div>
         </div>
-        <button id="reloadBtn" class="ghost-btn" type="button">Actualizar</button>
-      </div>
-      <div id="videoList" class="video-list"></div>
-      <div id="emptyState" class="empty-state hidden">
-        No hay videos activos en Supabase. Verifique la tabla <strong>ehs_training_videos</strong> o ejecute el archivo SQL inicial.
-      </div>
+
+        <div class="progress-track" aria-hidden="true">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <p id="progressSummary" class="progress-text">0 de 0 completados</p>
+      </section>
+
+      <section id="completionPanel" class="success-panel hidden" aria-live="polite">
+        <strong>Ha completado esta ruta de aprendizaje.</strong>
+        <p>Recuerde firmar todos los formatos RH-F-05 correspondientes.</p>
+      </section>
+
+      <section id="nextTrainingPanel" class="next-panel" aria-labelledby="nextTitle">
+        <div>
+          <p class="eyebrow">Tu siguiente capacitacion</p>
+          <h2 id="nextTitle">Continuar ruta EHS</h2>
+          <p id="nextDescription" class="muted">Se mostrara el primer video pendiente segun el orden configurado.</p>
+        </div>
+        <button id="continueNextBtn" class="primary-btn" type="button">Continuar capacitacion</button>
+      </section>
+
+      <section class="signature-banner" aria-label="Recordatorio de firma fisica">
+        <div>
+          <strong>El registro digital no sustituye la firma fisica.</strong>
+          <p>Debe firmar el formato RH-F-05 correspondiente a cada capacitacion.</p>
+        </div>
+        <a class="secondary-btn" href="docs/RH-F-05-Control-de-asistencia-a-capacitaciones.pdf" target="_blank" rel="noopener">Abrir RH-F-05</a>
+      </section>
+
+      <section id="videoViewer" class="panel video-viewer hidden" aria-labelledby="viewerTitle">
+        <div class="viewer-top">
+          <button id="backToLibraryBtn" class="ghost-btn" type="button">Volver a biblioteca</button>
+          <span id="viewerStatus" class="status-pill pending">Pendiente</span>
+        </div>
+        <div class="viewer-copy">
+          <p id="viewerCategory" class="eyebrow">EHS</p>
+          <h2 id="viewerTitle">Capacitacion</h2>
+          <p id="viewerDescription" class="muted"></p>
+        </div>
+        <video id="trainingPlayer" class="training-video" controls preload="metadata" playsinline></video>
+        <div class="viewer-progress">
+          <div class="progress-track" aria-hidden="true">
+            <div id="viewerProgressBar" class="progress-bar"></div>
+          </div>
+          <p id="viewerProgressText" class="muted">Avance visto: 0%. Debe llegar al 95% para completar.</p>
+        </div>
+        <div class="viewer-actions">
+          <button id="completeVideoBtn" class="primary-btn" type="button" disabled>Marcar como completado</button>
+          <a id="openVideoLink" class="secondary-btn" href="#" target="_blank" rel="noopener">Abrir video en pestana nueva</a>
+        </div>
+        <p class="signature-note">El registro digital no sustituye la firma fisica. Debe firmar RH-F-05.</p>
+      </section>
+
+      <section aria-labelledby="libraryTitle">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Biblioteca</p>
+            <h2 id="libraryTitle">Capacitaciones disponibles</h2>
+          </div>
+          <button id="reloadBtn" class="ghost-btn" type="button">Actualizar</button>
+        </div>
+        <div id="videoList" class="video-list"></div>
+        <div id="emptyState" class="empty-state hidden">
+          No hay capacitaciones activas en Supabase. Agregue videos desde el panel administrador o revise la tabla ehs_training_videos.
+        </div>
+      </section>
     </section>
   </main>
 
@@ -90,10 +150,10 @@
     <div class="modal-panel">
       <div class="section-title">
         <div>
-          <p class="eyebrow">Administración</p>
-          <h2 id="adminTitle">Registros completados</h2>
+          <p class="eyebrow">Administracion</p>
+          <h2 id="adminTitle">Panel SBM Safety Academy</h2>
         </div>
-        <button id="adminCloseBtn" class="icon-btn" type="button" aria-label="Cerrar panel">×</button>
+        <button id="adminCloseBtn" class="icon-btn" type="button" aria-label="Cerrar panel">x</button>
       </div>
 
       <form id="adminPinForm" class="pin-form">
@@ -105,40 +165,111 @@
       </form>
 
       <div id="adminContent" class="admin-content hidden">
-        <div class="filters">
-          <label>
-            Nombre o cédula
-            <input id="filterPerson" type="search" placeholder="Buscar colaborador">
-          </label>
-          <label>
-            Proyecto parcial
-            <input id="filterProject" type="search" placeholder="Ej. hospital">
-          </label>
-          <label>
-            Video
-            <select id="filterVideo">
-              <option value="">Todos los videos</option>
-            </select>
-          </label>
-          <button id="exportCsvBtn" class="secondary-btn" type="button">Exportar CSV</button>
+        <div class="admin-tabs" role="tablist" aria-label="Opciones administrativas">
+          <button id="adminRecordsTab" class="tab-btn active" type="button">Registros</button>
+          <button id="adminVideosTab" class="tab-btn" type="button">Capacitaciones</button>
         </div>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Colaborador</th>
-                <th>Cédula</th>
-                <th>Proyecto</th>
-                <th>Video</th>
-                <th>Fecha completado</th>
-                <th>Porcentaje</th>
-              </tr>
-            </thead>
-            <tbody id="adminRows"></tbody>
-          </table>
-        </div>
-        <p id="adminEmpty" class="muted hidden">No hay registros con esos filtros.</p>
+        <section id="adminRecordsPanel" class="admin-section">
+          <div class="admin-summary-grid">
+            <div class="admin-metric">
+              <span id="adminTotalViews">0</span>
+              <p>Total registros</p>
+            </div>
+            <div class="admin-metric">
+              <span id="adminCompletedViews">0</span>
+              <p>Completados</p>
+            </div>
+            <div class="admin-metric">
+              <span id="adminPendingViews">0</span>
+              <p>Pendientes</p>
+            </div>
+          </div>
+
+          <div class="filters">
+            <label>
+              Nombre o cedula
+              <input id="filterPerson" type="search" placeholder="Buscar colaborador">
+            </label>
+            <label>
+              Proyecto parcial
+              <input id="filterProject" type="search" placeholder="Ej. hospital">
+            </label>
+            <label>
+              Video
+              <select id="filterVideo">
+                <option value="">Todos los videos</option>
+              </select>
+            </label>
+            <button id="exportCsvBtn" class="secondary-btn" type="button">Exportar CSV</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Colaborador</th>
+                  <th>Cedula</th>
+                  <th>Proyecto</th>
+                  <th>Video</th>
+                  <th>Fecha</th>
+                  <th>Porcentaje</th>
+                </tr>
+              </thead>
+              <tbody id="adminRows"></tbody>
+            </table>
+          </div>
+          <p id="adminEmpty" class="muted hidden">No hay registros con esos filtros.</p>
+        </section>
+
+        <section id="adminVideosPanel" class="admin-section hidden">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Gestion futura</p>
+              <h3>Capacitaciones</h3>
+            </div>
+            <button id="newVideoBtn" class="primary-btn" type="button">Agregar capacitacion</button>
+          </div>
+
+          <form id="videoAdminForm" class="video-admin-form hidden">
+            <input id="adminVideoId" type="hidden">
+            <label>
+              Categoria
+              <select id="adminVideoCategory" required></select>
+            </label>
+            <label>
+              Codigo
+              <input id="adminVideoCode" type="text" placeholder="EHS-I-25" required>
+            </label>
+            <label>
+              Titulo
+              <input id="adminVideoTitle" type="text" required>
+            </label>
+            <label class="wide-field">
+              Descripcion
+              <textarea id="adminVideoDescription" rows="3"></textarea>
+            </label>
+            <label class="wide-field">
+              file_path
+              <input id="adminVideoFilePath" type="text" placeholder="videos/EHS-I-25-Nombre-del-video.mp4" required>
+            </label>
+            <label>
+              Orden
+              <input id="adminVideoOrder" type="number" min="0" step="1" value="0">
+            </label>
+            <label class="check-row">
+              <input id="adminVideoActive" type="checkbox" checked>
+              Activo
+            </label>
+            <div class="form-actions wide-field">
+              <button class="primary-btn" type="submit">Guardar capacitacion</button>
+              <button id="cancelVideoEditBtn" class="secondary-btn" type="button">Cancelar</button>
+            </div>
+          </form>
+
+          <div id="adminVideoList" class="admin-video-list"></div>
+          <p id="adminVideoEmpty" class="muted hidden">No hay capacitaciones para administrar.</p>
+        </section>
       </div>
     </div>
   </div>

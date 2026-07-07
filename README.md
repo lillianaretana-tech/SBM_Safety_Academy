@@ -1,32 +1,45 @@
 # SBM Safety Academy
 
-Plataforma web mobile-first de microcapacitaciones EHS para colaboradores operativos de SBM. Usa HTML, CSS y JavaScript vanilla, se publica en GitHub Pages y guarda datos en Supabase.
+LMS mobile-first de microcapacitaciones EHS para colaboradores operativos de SBM. Usa HTML, CSS y JavaScript vanilla, Supabase JS v2 desde CDN y GitHub Pages.
 
 ## Archivos
 
-- `index.html`: estructura de la aplicacion.
-- `styles.css`: diseno responsive alineado a colores SBM.
-- `app.js`: conexion Supabase, registro, progreso, videos y panel administrador.
-- `supabase_setup.sql`: tablas, llaves foraneas, datos iniciales, RLS y policies.
+- `index.html`: estructura de la aplicacion LMS.
+- `styles.css`: diseno mobile-first con colores SBM.
+- `app.js`: registro, dashboard, progreso, reproductor, admin y gestion basica de capacitaciones.
+- `supabase_setup.sql`: estructura sugerida de tablas `ehs_*`, datos iniciales, RLS y policies.
+- `assets/Logo_SBM.png`: logo usado en el encabezado y referencia visual de marca.
 
-## Puesta en marcha
+## Funcionalidad principal
 
-1. En Supabase, abra el SQL Editor y ejecute `supabase_setup.sql` si necesita recrear o actualizar la estructura.
-2. Suba estos archivos al repositorio de GitHub Pages.
-3. Cree las carpetas:
+- Registro por nombre, cedula y proyecto/site.
+- Dashboard del colaborador con nombre, proyecto, porcentaje, completados y pendientes.
+- Seccion `Tu siguiente capacitacion` con el primer video pendiente segun `sort_order`.
+- Biblioteca de videos con estado: pendiente, en progreso o completado.
+- Vista dedicada de video con reproductor de tamano controlado.
+- Guardado de avance parcial en `ehs_video_views.progress_percent`.
+- Boton `Marcar como completado` habilitado solo al llegar al 95%.
+- Felicitacion al completar toda la ruta.
+- Recordatorio permanente de firma fisica RH-F-05.
+
+## Puesta en marcha en GitHub Pages
+
+1. Suba `index.html`, `styles.css`, `app.js` y las carpetas necesarias al repositorio.
+2. Cree o mantenga estas carpetas:
 
 ```text
+assets/
 videos/
 docs/
 ```
 
-4. Coloque el PDF en:
+3. Coloque el PDF en:
 
 ```text
 docs/RH-F-05-Control-de-asistencia-a-capacitaciones.pdf
 ```
 
-5. Coloque los videos con los nombres exactos configurados en Supabase:
+4. Coloque los MP4 con las rutas exactas guardadas en Supabase. Ejemplos actuales:
 
 ```text
 videos/EHS-I-05-Decapado-y-encerado-de-pisos.mp4
@@ -38,48 +51,44 @@ videos/EHS-I-23-Traslado-de-objetos.mp4
 videos/EHS-I-24-Uso-de-estaciones-de-dilucion-y-piletas-de-lavado.mp4
 ```
 
-La anon key del proyecto Supabase ya esta configurada en `app.js` como constante editable.
-
-## Uso
-
-El colaborador registra nombre, cedula y proyecto/site libre. La app crea o actualiza el registro en `ehs_employees`, carga videos activos desde `ehs_training_videos` y muestra progreso personal.
-
-El boton `Marcar como completado` se activa cuando el colaborador ha visto al menos 95% del video. Al completar, se guarda en `ehs_video_views` con:
-
-- `employee_id`
-- `video_id`
-- `started_at`
-- `completed_at`
-- `progress_percent`
-- `completed = true`
-- `signature_required = true`
-- `signature_reminder_ack = true`
-
-La app muestra siempre el recordatorio de que el registro digital no sustituye la firma fisica del formato RH-F-05.
+GitHub Pages distingue mayusculas, minusculas y guiones. El valor `file_path` de Supabase debe coincidir exactamente.
 
 ## Panel administrador
 
-El boton `Panel administrador` usa una clave local temporal definida en `app.js`:
+El PIN temporal esta en `app.js`:
 
 ```js
-const ADMIN_PIN = "2026";
+const ADMIN_PIN = "2580";
 ```
 
-El panel muestra registros completados, filtros por nombre/cedula, proyecto parcial y video, ademas de exportacion CSV.
+Incluye:
 
-Nota: este PIN es una barrera operativa simple para GitHub Pages, no seguridad fuerte. Para un panel realmente privado conviene agregar autenticacion Supabase o mover reportes a una herramienta interna con credenciales.
+- Resumen de registros: total, completados y pendientes.
+- Tabla con colaborador, cedula, proyecto, video, fecha y porcentaje.
+- Filtros por nombre/cedula, proyecto parcial y video.
+- Exportacion CSV.
+- Pestana de capacitaciones para listar, crear, editar datos basicos y activar/desactivar videos.
 
-## Escalabilidad
+Nota importante: el PIN local no es seguridad fuerte. El modulo de crear/editar videos usa la anon key del proyecto. Para que funcione, Supabase debe permitir `insert` y `update` en `ehs_training_videos` para el rol/policy correspondiente. El archivo `supabase_setup.sql` ya incluye policies anon para este uso operativo; si RLS lo bloquea, la app mostrara un error claro.
 
-Para agregar nuevas categorias o videos no hay que cambiar el frontend. Inserte nuevas filas en:
+## Agregar capacitaciones
 
-- `ehs_training_categories`
-- `ehs_training_videos`
+1. Suba manualmente el MP4 a `/videos/` en GitHub.
+2. En el panel administrador, use `Agregar capacitacion`.
+3. Complete:
 
-Use `active = true` y un `file_path` relativo al repositorio, por ejemplo:
+- categoria
+- codigo
+- titulo
+- descripcion
+- `file_path`
+- orden
+- activo
 
-```text
-videos/NUEVO-CODIGO-Nombre-del-video.mp4
-```
+No se suben archivos MP4 desde la app; solo se registra la metadata en Supabase.
 
-Respete mayusculas, guiones y nombres exactos, especialmente en GitHub Pages.
+## Recomendaciones futuras
+
+- Cambiar el PIN local por autenticacion real de Supabase.
+- Separar policies de lectura publica y administracion privada.
+- Agregar una tabla de auditoria si se requiere trazabilidad formal de cambios de videos.

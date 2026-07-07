@@ -1,6 +1,6 @@
 const SUPABASE_URL = "https://vgkyoyosjewdygxtnqvu.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZna3lveW9zamV3ZHlneHRucXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NTAxNDAsImV4cCI6MjA5ODIyNjE0MH0.oDxSWg61UFLqMh2MeEW6yxarZAjobhEA6TWm0KS_7CA";
-const ADMIN_PIN = "2026";
+const ADMIN_PIN = "2580";
 
 const STORAGE_EMPLOYEE_KEY = "sbmSafetyAcademyEmployee";
 const STORAGE_PROGRESS_PREFIX = "sbmSafetyAcademyProgress:";
@@ -9,10 +9,13 @@ const state = {
   supabase: null,
   employee: null,
   videos: [],
+  categories: [],
   views: new Map(),
   localProgress: {},
   progressSync: {},
+  currentVideo: null,
   adminRows: [],
+  adminVideos: [],
   adminAuthenticated: false
 };
 
@@ -27,14 +30,37 @@ document.addEventListener("DOMContentLoaded", () => {
 function cacheDom() {
   Object.assign(dom, {
     appAlert: document.getElementById("appAlert"),
+    registerPanel: document.getElementById("registerPanel"),
+    learnerArea: document.getElementById("learnerArea"),
     employeeForm: document.getElementById("employeeForm"),
     fullName: document.getElementById("fullName"),
     cedula: document.getElementById("cedula"),
     projectSite: document.getElementById("projectSite"),
     sessionBadge: document.getElementById("sessionBadge"),
+    learnerName: document.getElementById("learnerName"),
+    learnerProject: document.getElementById("learnerProject"),
+    changeUserBtn: document.getElementById("changeUserBtn"),
+    metricPercent: document.getElementById("metricPercent"),
+    metricCompleted: document.getElementById("metricCompleted"),
+    metricPending: document.getElementById("metricPending"),
     progressSummary: document.getElementById("progressSummary"),
     progressBar: document.getElementById("progressBar"),
-    progressPercent: document.getElementById("progressPercent"),
+    completionPanel: document.getElementById("completionPanel"),
+    nextTrainingPanel: document.getElementById("nextTrainingPanel"),
+    nextTitle: document.getElementById("nextTitle"),
+    nextDescription: document.getElementById("nextDescription"),
+    continueNextBtn: document.getElementById("continueNextBtn"),
+    videoViewer: document.getElementById("videoViewer"),
+    backToLibraryBtn: document.getElementById("backToLibraryBtn"),
+    viewerStatus: document.getElementById("viewerStatus"),
+    viewerCategory: document.getElementById("viewerCategory"),
+    viewerTitle: document.getElementById("viewerTitle"),
+    viewerDescription: document.getElementById("viewerDescription"),
+    trainingPlayer: document.getElementById("trainingPlayer"),
+    viewerProgressBar: document.getElementById("viewerProgressBar"),
+    viewerProgressText: document.getElementById("viewerProgressText"),
+    completeVideoBtn: document.getElementById("completeVideoBtn"),
+    openVideoLink: document.getElementById("openVideoLink"),
     videoList: document.getElementById("videoList"),
     emptyState: document.getElementById("emptyState"),
     reloadBtn: document.getElementById("reloadBtn"),
@@ -44,29 +70,67 @@ function cacheDom() {
     adminPinForm: document.getElementById("adminPinForm"),
     adminPin: document.getElementById("adminPin"),
     adminContent: document.getElementById("adminContent"),
+    adminRecordsTab: document.getElementById("adminRecordsTab"),
+    adminVideosTab: document.getElementById("adminVideosTab"),
+    adminRecordsPanel: document.getElementById("adminRecordsPanel"),
+    adminVideosPanel: document.getElementById("adminVideosPanel"),
+    adminTotalViews: document.getElementById("adminTotalViews"),
+    adminCompletedViews: document.getElementById("adminCompletedViews"),
+    adminPendingViews: document.getElementById("adminPendingViews"),
     filterPerson: document.getElementById("filterPerson"),
     filterProject: document.getElementById("filterProject"),
     filterVideo: document.getElementById("filterVideo"),
     adminRows: document.getElementById("adminRows"),
     adminEmpty: document.getElementById("adminEmpty"),
-    exportCsvBtn: document.getElementById("exportCsvBtn")
+    exportCsvBtn: document.getElementById("exportCsvBtn"),
+    newVideoBtn: document.getElementById("newVideoBtn"),
+    videoAdminForm: document.getElementById("videoAdminForm"),
+    adminVideoId: document.getElementById("adminVideoId"),
+    adminVideoCategory: document.getElementById("adminVideoCategory"),
+    adminVideoCode: document.getElementById("adminVideoCode"),
+    adminVideoTitle: document.getElementById("adminVideoTitle"),
+    adminVideoDescription: document.getElementById("adminVideoDescription"),
+    adminVideoFilePath: document.getElementById("adminVideoFilePath"),
+    adminVideoOrder: document.getElementById("adminVideoOrder"),
+    adminVideoActive: document.getElementById("adminVideoActive"),
+    cancelVideoEditBtn: document.getElementById("cancelVideoEditBtn"),
+    adminVideoList: document.getElementById("adminVideoList"),
+    adminVideoEmpty: document.getElementById("adminVideoEmpty")
   });
 }
 
 function bindEvents() {
   dom.employeeForm.addEventListener("submit", saveEmployee);
+  dom.changeUserBtn.addEventListener("click", changeUser);
   dom.reloadBtn.addEventListener("click", refreshAll);
+  dom.continueNextBtn.addEventListener("click", openNextVideo);
+  dom.backToLibraryBtn.addEventListener("click", closeVideoViewer);
+  dom.trainingPlayer.addEventListener("loadedmetadata", restoreCurrentVideoPosition);
+  dom.trainingPlayer.addEventListener("play", () => startVideo(state.currentVideo?.id));
+  dom.trainingPlayer.addEventListener("timeupdate", handleCurrentVideoProgress);
+  dom.trainingPlayer.addEventListener("pause", syncCurrentVideoProgress);
+  dom.trainingPlayer.addEventListener("ended", () => handleCurrentVideoProgress(true));
+  dom.trainingPlayer.addEventListener("error", () => {
+    if (!state.currentVideo) return;
+    showAlert(`El video ${getVideoCode(state.currentVideo)} no se pudo reproducir. Use "Abrir video en pestana nueva" o revise la ruta exacta en GitHub/Supabase.`);
+  });
+  dom.completeVideoBtn.addEventListener("click", completeCurrentVideo);
   dom.adminOpenBtn.addEventListener("click", openAdmin);
   dom.adminCloseBtn.addEventListener("click", closeAdmin);
   dom.adminModal.addEventListener("click", (event) => {
     if (event.target === dom.adminModal) closeAdmin();
   });
   dom.adminPinForm.addEventListener("submit", unlockAdmin);
+  dom.adminRecordsTab.addEventListener("click", () => setAdminTab("records"));
+  dom.adminVideosTab.addEventListener("click", () => setAdminTab("videos"));
   [dom.filterPerson, dom.filterProject, dom.filterVideo].forEach((control) => {
     control.addEventListener("input", renderAdminRows);
     control.addEventListener("change", renderAdminRows);
   });
   dom.exportCsvBtn.addEventListener("click", exportCsv);
+  dom.newVideoBtn.addEventListener("click", startNewVideoForm);
+  dom.cancelVideoEditBtn.addEventListener("click", resetVideoForm);
+  dom.videoAdminForm.addEventListener("submit", saveAdminVideo);
 }
 
 async function boot() {
@@ -77,38 +141,28 @@ async function boot() {
 
 function initSupabase() {
   if (!window.supabase || !window.supabase.createClient) {
-    showAlert("No se pudo cargar Supabase JS. Revise la conexión a internet o el CDN configurado.");
+    showAlert("No se pudo cargar Supabase JS. Revise la conexion a internet o el CDN configurado.");
     return;
   }
-
-  if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("PEGA_AQUI")) {
-    showAlert("Falta configurar SUPABASE_ANON_KEY en app.js. Pegue la anon key del proyecto Supabase para activar la conexión.");
-    return;
-  }
-
   state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
 function restoreEmployee() {
   const saved = safeJsonParse(localStorage.getItem(STORAGE_EMPLOYEE_KEY), null);
   if (!saved || !saved.id) return;
-
   state.employee = saved;
   dom.fullName.value = saved.full_name || "";
   dom.cedula.value = saved.cedula || "";
   dom.projectSite.value = saved.project_site || "";
   loadLocalProgress();
-  updateSessionBadge();
+  updateSession();
 }
 
 async function refreshAll() {
   clearAlert();
-  await loadVideos();
-  if (state.employee) {
-    await loadViews();
-  }
-  renderVideos();
-  renderProgress();
+  await Promise.all([loadCategories(), loadVideos()]);
+  if (state.employee) await loadViews();
+  renderLearnerExperience();
 }
 
 async function saveEmployee(event) {
@@ -123,7 +177,7 @@ async function saveEmployee(event) {
   };
 
   if (!payload.full_name || !payload.cedula || !payload.project_site) {
-    showAlert("Complete nombre, cédula y proyecto/site para continuar.");
+    showAlert("Complete nombre, cedula y proyecto/site para continuar.");
     return;
   }
 
@@ -143,52 +197,127 @@ async function saveEmployee(event) {
   state.employee = data;
   localStorage.setItem(STORAGE_EMPLOYEE_KEY, JSON.stringify(data));
   loadLocalProgress();
-  updateSessionBadge();
+  updateSession();
   await loadViews();
-  renderVideos();
-  renderProgress();
+  renderLearnerExperience();
+}
+
+function changeUser() {
+  localStorage.removeItem(STORAGE_EMPLOYEE_KEY);
+  state.employee = null;
+  state.views = new Map();
+  state.localProgress = {};
+  state.currentVideo = null;
+  dom.trainingPlayer.pause();
+  dom.trainingPlayer.removeAttribute("src");
+  dom.trainingPlayer.load();
+  dom.employeeForm.reset();
+  renderLearnerExperience();
+}
+
+async function loadCategories() {
+  state.categories = [];
+  if (!requireSupabase(false)) return;
+  const { data, error } = await state.supabase
+    .from("ehs_training_categories")
+    .select("id, name, description, sort_order, active")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) {
+    showAlert(`No se pudieron cargar las categorias: ${error.message}`);
+    return;
+  }
+  state.categories = data || [];
 }
 
 async function loadVideos() {
   state.videos = [];
-  if (!requireSupabase(false)) {
-    renderVideos();
-    return;
-  }
-
+  if (!requireSupabase(false)) return;
   const { data, error } = await state.supabase
     .from("ehs_training_videos")
     .select("id, category_id, video_code, title, description, file_path, active, sort_order, ehs_training_categories(name)")
     .eq("active", true)
     .order("sort_order", { ascending: true })
     .order("video_code", { ascending: true });
-
   if (error) {
     showAlert(`No se pudieron cargar los videos: ${error.message}`);
     return;
   }
-
-  state.videos = Array.isArray(data) ? data : [];
+  state.videos = data || [];
 }
 
 async function loadViews() {
   state.views = new Map();
   if (!state.employee || !requireSupabase(false)) return;
-
   const { data, error } = await state.supabase
     .from("ehs_video_views")
     .select("*")
     .eq("employee_id", state.employee.id);
-
   if (error) {
     showAlert(`No se pudo cargar el progreso personal: ${error.message}`);
     return;
   }
-
   (data || []).forEach((view) => state.views.set(view.video_id, view));
 }
 
-function renderVideos() {
+function renderLearnerExperience() {
+  updateSession();
+  renderProgress();
+  renderNextTraining();
+  renderVideoLibrary();
+  updateCurrentViewer();
+}
+
+function updateSession() {
+  const hasEmployee = Boolean(state.employee);
+  dom.registerPanel.classList.toggle("hidden", hasEmployee);
+  dom.learnerArea.classList.toggle("hidden", !hasEmployee);
+
+  if (!hasEmployee) {
+    dom.sessionBadge.textContent = "Sin registro";
+    dom.sessionBadge.className = "status-pill pending";
+    return;
+  }
+
+  dom.sessionBadge.textContent = `Registrado: ${state.employee.full_name}`;
+  dom.sessionBadge.className = "status-pill completed";
+  dom.learnerName.textContent = state.employee.full_name || "colaborador";
+  dom.learnerProject.textContent = `Proyecto: ${state.employee.project_site || "--"}`;
+}
+
+function renderProgress() {
+  const total = state.videos.length;
+  const completed = state.videos.filter((video) => state.views.get(video.id)?.completed).length;
+  const pending = Math.max(0, total - completed);
+  const percent = total ? Math.round((completed / total) * 100) : 0;
+
+  dom.metricPercent.textContent = `${percent}%`;
+  dom.metricCompleted.textContent = `${completed} de ${total}`;
+  dom.metricPending.textContent = `${pending}`;
+  dom.progressSummary.textContent = `${completed} de ${total} completados`;
+  dom.progressBar.style.width = `${percent}%`;
+  dom.completionPanel.classList.toggle("hidden", !(total > 0 && completed === total));
+}
+
+function renderNextTraining() {
+  const next = getNextPendingVideo();
+  dom.nextTrainingPanel.classList.toggle("hidden", !next);
+  if (!next) return;
+  dom.nextTitle.textContent = `${getVideoCode(next)} - ${next.title || "Capacitacion"}`;
+  dom.nextDescription.textContent = next.description || "Continua con la siguiente capacitacion pendiente de tu ruta.";
+  dom.continueNextBtn.disabled = false;
+}
+
+function getNextPendingVideo() {
+  return state.videos.find((video) => !state.views.get(video.id)?.completed) || null;
+}
+
+function openNextVideo() {
+  const next = getNextPendingVideo();
+  if (next) openVideo(next.id);
+}
+
+function renderVideoLibrary() {
   dom.videoList.innerHTML = "";
   dom.emptyState.classList.toggle("hidden", state.videos.length > 0);
 
@@ -201,42 +330,69 @@ function renderVideos() {
     card.innerHTML = `
       <div class="video-body">
         <div class="video-meta">
-          <span class="category-chip">${escapeHtml(video.ehs_training_categories?.name || "EHS")}</span>
+          <span class="category-chip">${escapeHtml(getCategoryName(video))}</span>
           <span class="code-chip">${escapeHtml(getVideoCode(video))}</span>
           <span class="status-pill ${status.className}">${status.label}</span>
         </div>
         <div>
-          <h3>${escapeHtml(video.title || "Capacitación sin título")}</h3>
-          <p>${escapeHtml(video.description || "Sin descripción.")}</p>
+          <h3>${escapeHtml(video.title || "Capacitacion sin titulo")}</h3>
+          <p class="muted">${escapeHtml(video.description || "Sin descripcion.")}</p>
         </div>
-        <video class="training-video" controls preload="metadata" playsinline src="${escapeAttribute(video.file_path || "")}"></video>
+        <p class="muted">Avance del video: <strong>${Math.round(progress)}%</strong></p>
         <div class="video-actions">
-          <button class="primary-btn complete-btn" type="button" ${isCompleteButtonEnabled(progress, view) ? "" : "disabled"}>
-            ${view?.completed ? "Completado" : "Marcar como completado"}
-          </button>
-          <div>
-            <p class="muted">Avance visto: <strong>${Math.round(progress)}%</strong>. Debe llegar al 95% para completar.</p>
-            <a class="video-link" href="${escapeAttribute(video.file_path || "")}" target="_blank" rel="noopener">Abrir video en pestaña nueva</a>
-          </div>
+          <button class="primary-btn" type="button" data-open-video="${escapeAttribute(video.id)}">Ver video</button>
+          <a class="secondary-btn" href="${escapeAttribute(video.file_path || "#")}" target="_blank" rel="noopener">Abrir video en pestana nueva</a>
         </div>
+        <p class="muted">Debe firmar RH-F-05 al completar esta capacitacion.</p>
       </div>
     `;
-
-    const videoEl = card.querySelector("video");
-    const completeBtn = card.querySelector(".complete-btn");
-    videoEl.addEventListener("loadedmetadata", () => restoreVideoPosition(video.id, videoEl));
-    videoEl.addEventListener("play", () => startVideo(video.id));
-    videoEl.addEventListener("timeupdate", () => handleVideoProgress(video.id, videoEl, card));
-    videoEl.addEventListener("pause", () => syncCurrentVideoProgress(video.id, videoEl));
-    videoEl.addEventListener("ended", () => handleVideoProgress(video.id, videoEl, card, true));
-    videoEl.addEventListener("error", () => showAlert(`El video ${getVideoCode(video) || video.title} no se pudo reproducir. Use el enlace "Abrir video en pestaña nueva" o revise la ruta en Supabase.`));
-    completeBtn.addEventListener("click", () => completeVideo(video.id, card));
+    card.querySelector("[data-open-video]").addEventListener("click", () => openVideo(video.id));
     dom.videoList.appendChild(card);
   });
 }
 
+function openVideo(videoId) {
+  const video = state.videos.find((item) => item.id === videoId);
+  if (!video) {
+    showAlert("No se encontro la capacitacion seleccionada.");
+    return;
+  }
+  state.currentVideo = video;
+  dom.videoViewer.classList.remove("hidden");
+  dom.trainingPlayer.src = video.file_path || "";
+  dom.trainingPlayer.load();
+  updateCurrentViewer();
+  dom.videoViewer.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function closeVideoViewer() {
+  syncCurrentVideoProgress();
+  dom.trainingPlayer.pause();
+  dom.videoViewer.classList.add("hidden");
+}
+
+function updateCurrentViewer() {
+  const video = state.currentVideo;
+  if (!video) return;
+
+  const view = state.views.get(video.id);
+  const progress = getVideoProgress(video.id, view);
+  const status = getStatus(progress, view);
+
+  dom.viewerStatus.className = `status-pill ${status.className}`;
+  dom.viewerStatus.textContent = status.label;
+  dom.viewerCategory.textContent = getCategoryName(video);
+  dom.viewerTitle.textContent = `${getVideoCode(video)} - ${video.title || "Capacitacion"}`;
+  dom.viewerDescription.textContent = video.description || "Sin descripcion.";
+  dom.openVideoLink.href = video.file_path || "#";
+  dom.viewerProgressBar.style.width = `${Math.min(100, Math.round(progress))}%`;
+  dom.viewerProgressText.textContent = `Avance visto: ${Math.round(progress)}%. Debe llegar al 95% para completar.`;
+  dom.completeVideoBtn.disabled = !isCompleteButtonEnabled(progress, view);
+  dom.completeVideoBtn.textContent = view?.completed ? "Completado" : "Marcar como completado";
+}
+
 async function startVideo(videoId) {
-  if (!state.employee || !requireSupabase(false)) return;
+  if (!videoId || !state.employee || !requireSupabase(false)) return;
   if (state.views.has(videoId)) return;
 
   const payload = {
@@ -254,45 +410,49 @@ async function startVideo(videoId) {
     .upsert(payload, { onConflict: "employee_id,video_id" })
     .select()
     .single();
-
   if (!error && data) state.views.set(videoId, data);
 }
 
-function handleVideoProgress(videoId, videoEl, card, forceComplete = false) {
-  if (!videoEl.duration || Number.isNaN(videoEl.duration)) return;
-  const percent = Math.min(100, (videoEl.currentTime / videoEl.duration) * 100);
-  const nextProgress = forceComplete ? 100 : percent;
-  if (!state.localProgress[videoId] || percent > state.localProgress[videoId]) {
-    state.localProgress[videoId] = nextProgress;
+function handleCurrentVideoProgress(forceComplete = false) {
+  const video = state.currentVideo;
+  const player = dom.trainingPlayer;
+  if (!video || !player.duration || Number.isNaN(player.duration)) return;
+
+  const percent = Math.min(100, (player.currentTime / player.duration) * 100);
+  const nextProgress = forceComplete === true ? 100 : percent;
+  if (!state.localProgress[video.id] || nextProgress > state.localProgress[video.id]) {
+    state.localProgress[video.id] = nextProgress;
     saveLocalProgress();
   }
-  updateCardProgress(videoId, card);
-  renderProgress();
-  syncPartialProgress(videoId, nextProgress, forceComplete);
+  updateCurrentViewer();
+  renderVideoLibrary();
+  syncPartialProgress(video.id, nextProgress, forceComplete === true);
 }
 
-function syncCurrentVideoProgress(videoId, videoEl) {
-  if (!videoEl.duration || Number.isNaN(videoEl.duration)) return;
-  const percent = Math.min(100, (videoEl.currentTime / videoEl.duration) * 100);
-  if (percent > 0) syncPartialProgress(videoId, percent, true);
+function syncCurrentVideoProgress() {
+  const video = state.currentVideo;
+  const player = dom.trainingPlayer;
+  if (!video || !player.duration || Number.isNaN(player.duration)) return;
+  const percent = Math.min(100, (player.currentTime / player.duration) * 100);
+  if (percent > 0) syncPartialProgress(video.id, percent, true);
 }
 
-function restoreVideoPosition(videoId, videoEl) {
-  const view = state.views.get(videoId);
-  if (view?.completed || !videoEl.duration || Number.isNaN(videoEl.duration)) return;
+function restoreCurrentVideoPosition() {
+  const video = state.currentVideo;
+  const player = dom.trainingPlayer;
+  if (!video || !player.duration || Number.isNaN(player.duration)) return;
 
-  const progress = getVideoProgress(videoId, view);
+  const view = state.views.get(video.id);
+  if (view?.completed) return;
+  const progress = getVideoProgress(video.id, view);
   if (progress < 2 || progress >= 95) return;
 
-  const resumeAt = Math.max(0, ((progress / 100) * videoEl.duration) - 5);
-  if (resumeAt > 0 && resumeAt < videoEl.duration) {
-    videoEl.currentTime = resumeAt;
-  }
+  const resumeAt = Math.max(0, ((progress / 100) * player.duration) - 5);
+  if (resumeAt > 0 && resumeAt < player.duration) player.currentTime = resumeAt;
 }
 
 async function syncPartialProgress(videoId, progress, force = false) {
   if (!state.employee || !requireSupabase(false)) return;
-
   const existing = state.views.get(videoId);
   if (existing?.completed) return;
 
@@ -325,36 +485,25 @@ async function syncPartialProgress(videoId, progress, force = false) {
   if (!error && data) {
     state.views.set(videoId, data);
     state.progressSync[videoId] = { at: now, progress: Number(data.progress_percent || roundedProgress) };
+    renderProgress();
+    renderNextTraining();
   }
 }
 
-function updateCardProgress(videoId, card) {
-  const view = state.views.get(videoId);
-  const progress = getVideoProgress(videoId, view);
-  const status = getStatus(progress, view);
-  const statusPill = card.querySelector(".status-pill");
-  const completeBtn = card.querySelector(".complete-btn");
-  const progressText = card.querySelector(".muted strong");
-
-  statusPill.className = `status-pill ${status.className}`;
-  statusPill.textContent = status.label;
-  progressText.textContent = `${Math.round(progress)}%`;
-  completeBtn.disabled = !isCompleteButtonEnabled(progress, view);
-  completeBtn.textContent = view?.completed ? "Completado" : "Marcar como completado";
-}
-
-async function completeVideo(videoId, card) {
+async function completeCurrentVideo() {
+  const video = state.currentVideo;
+  if (!video) return;
   if (!state.employee) {
     showAlert("Primero registre el colaborador para guardar el avance personal.");
     return;
   }
   if (!requireSupabase()) return;
 
-  const progress = Math.max(95, getVideoProgress(videoId));
-  const existing = state.views.get(videoId);
+  const progress = Math.max(95, getVideoProgress(video.id));
+  const existing = state.views.get(video.id);
   const payload = {
     employee_id: state.employee.id,
-    video_id: videoId,
+    video_id: video.id,
     started_at: existing?.started_at || new Date().toISOString(),
     completed_at: new Date().toISOString(),
     progress_percent: progress,
@@ -370,25 +519,15 @@ async function completeVideo(videoId, card) {
 
   const { data, error } = await query.select().single();
   if (error) {
-    showAlert(`No se pudo guardar la capacitación completada: ${error.message}`);
+    showAlert(`No se pudo guardar la capacitacion completada: ${error.message}`);
     return;
   }
 
-  state.views.set(videoId, data);
-  state.progressSync[videoId] = { at: Date.now(), progress: Number(data.progress_percent || progress) };
-  state.localProgress[videoId] = Math.max(state.localProgress[videoId] || 0, progress);
+  state.views.set(video.id, data);
+  state.progressSync[video.id] = { at: Date.now(), progress: Number(data.progress_percent || progress) };
+  state.localProgress[video.id] = Math.max(state.localProgress[video.id] || 0, progress);
   saveLocalProgress();
-  updateCardProgress(videoId, card);
-  renderProgress();
-}
-
-function renderProgress() {
-  const total = state.videos.length;
-  const completed = state.videos.filter((video) => state.views.get(video.id)?.completed).length;
-  const percent = total ? Math.round((completed / total) * 100) : 0;
-  dom.progressSummary.textContent = `${completed} de ${total} completados`;
-  dom.progressBar.style.width = `${percent}%`;
-  dom.progressPercent.textContent = `${percent}%`;
+  renderLearnerExperience();
 }
 
 function getVideoProgress(videoId, view = state.views.get(videoId)) {
@@ -399,18 +538,18 @@ function getVideoCode(video) {
   return video?.video_code || video?.code || "";
 }
 
+function getCategoryName(video) {
+  return video?.ehs_training_categories?.name || state.categories.find((item) => item.id === video?.category_id)?.name || "EHS";
+}
+
 function getStatus(progress, view) {
   if (view?.completed) return { label: "Completado", className: "completed" };
   if (progress > 0) return { label: "En progreso", className: "in-progress" };
   return { label: "Pendiente", className: "pending" };
 }
 
-function canComplete(progress, view) {
-  return Boolean(state.employee && (view?.completed || progress >= 95));
-}
-
 function isCompleteButtonEnabled(progress, view) {
-  return Boolean(!view?.completed && canComplete(progress, view));
+  return Boolean(state.employee && !view?.completed && progress >= 95);
 }
 
 function loadLocalProgress() {
@@ -426,16 +565,10 @@ function progressStorageKey() {
   return `${STORAGE_PROGRESS_PREFIX}${state.employee?.cedula || "anon"}`;
 }
 
-function updateSessionBadge() {
-  if (!state.employee) return;
-  dom.sessionBadge.textContent = `Registrado: ${state.employee.full_name}`;
-  dom.sessionBadge.className = "status-pill completed";
-}
-
 async function openAdmin() {
   dom.adminModal.classList.remove("hidden");
   dom.adminPin.focus();
-  if (state.adminAuthenticated) await loadAdminRows();
+  if (state.adminAuthenticated) await loadAdminData();
 }
 
 function closeAdmin() {
@@ -451,7 +584,20 @@ async function unlockAdmin(event) {
   state.adminAuthenticated = true;
   dom.adminPinForm.classList.add("hidden");
   dom.adminContent.classList.remove("hidden");
-  await loadAdminRows();
+  await loadAdminData();
+}
+
+function setAdminTab(tab) {
+  const isRecords = tab === "records";
+  dom.adminRecordsTab.classList.toggle("active", isRecords);
+  dom.adminVideosTab.classList.toggle("active", !isRecords);
+  dom.adminRecordsPanel.classList.toggle("hidden", !isRecords);
+  dom.adminVideosPanel.classList.toggle("hidden", isRecords);
+}
+
+async function loadAdminData() {
+  await Promise.all([loadAdminRows(), loadAdminVideos()]);
+  populateCategorySelect();
 }
 
 async function loadAdminRows() {
@@ -459,8 +605,7 @@ async function loadAdminRows() {
   const { data, error } = await state.supabase
     .from("ehs_video_views")
     .select("completed_at, progress_percent, completed, ehs_employees(full_name, cedula, project_site), ehs_training_videos(id, video_code, title)")
-    .eq("completed", true)
-    .order("completed_at", { ascending: false });
+    .order("updated_at", { ascending: false });
 
   if (error) {
     showAlert(`No se pudieron cargar los registros del administrador: ${error.message}`);
@@ -469,14 +614,39 @@ async function loadAdminRows() {
 
   state.adminRows = data || [];
   populateVideoFilter();
+  renderAdminSummary();
   renderAdminRows();
+}
+
+async function loadAdminVideos() {
+  if (!requireSupabase()) return;
+  const { data, error } = await state.supabase
+    .from("ehs_training_videos")
+    .select("id, category_id, video_code, title, description, file_path, active, sort_order, ehs_training_categories(name)")
+    .order("sort_order", { ascending: true })
+    .order("video_code", { ascending: true });
+
+  if (error) {
+    showAlert(`No se pudieron cargar las capacitaciones del administrador: ${error.message}`);
+    return;
+  }
+
+  state.adminVideos = data || [];
+  renderAdminVideos();
+}
+
+function renderAdminSummary() {
+  const total = state.adminRows.length;
+  const completed = state.adminRows.filter((row) => row.completed).length;
+  dom.adminTotalViews.textContent = total;
+  dom.adminCompletedViews.textContent = completed;
+  dom.adminPendingViews.textContent = Math.max(0, total - completed);
 }
 
 function populateVideoFilter() {
   const current = dom.filterVideo.value;
   const options = new Map();
-  state.adminRows.forEach((row) => {
-    const video = row.ehs_training_videos;
+  [...state.videos, ...state.adminVideos].forEach((video) => {
     if (video?.id) options.set(video.id, `${getVideoCode(video)} - ${video.title}`);
   });
 
@@ -528,7 +698,7 @@ function renderAdminRows() {
 
 function exportCsv() {
   const rows = getFilteredAdminRows();
-  const header = ["colaborador", "cedula", "proyecto", "video", "fecha_completado", "porcentaje"];
+  const header = ["colaborador", "cedula", "proyecto", "video", "fecha", "porcentaje", "completado"];
   const body = rows.map((row) => {
     const employee = row.ehs_employees || {};
     const video = row.ehs_training_videos || {};
@@ -538,7 +708,8 @@ function exportCsv() {
       employee.project_site || "",
       `${getVideoCode(video)} - ${video.title || ""}`,
       formatDate(row.completed_at),
-      Math.round(Number(row.progress_percent || 0))
+      Math.round(Number(row.progress_percent || 0)),
+      row.completed ? "si" : "no"
     ];
   });
   const csv = [header, ...body].map((line) => line.map(csvCell).join(",")).join("\n");
@@ -551,6 +722,140 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
+function populateCategorySelect() {
+  dom.adminVideoCategory.innerHTML = "";
+  state.categories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category.id;
+    option.textContent = category.name;
+    dom.adminVideoCategory.appendChild(option);
+  });
+  if (!state.categories.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Sin categorias disponibles";
+    dom.adminVideoCategory.appendChild(option);
+  }
+}
+
+function renderAdminVideos() {
+  dom.adminVideoList.innerHTML = "";
+  dom.adminVideoEmpty.classList.toggle("hidden", state.adminVideos.length > 0);
+
+  state.adminVideos.forEach((video) => {
+    const card = document.createElement("article");
+    card.className = "admin-video-card";
+    card.innerHTML = `
+      <div>
+        <div class="video-meta">
+          <span class="category-chip">${escapeHtml(getCategoryName(video))}</span>
+          <span class="code-chip">${escapeHtml(getVideoCode(video))}</span>
+          <span class="status-pill ${video.active ? "completed" : "pending"}">${video.active ? "Activo" : "Inactivo"}</span>
+        </div>
+        <h3>${escapeHtml(video.title || "Capacitacion")}</h3>
+        <p class="muted">${escapeHtml(video.file_path || "")}</p>
+      </div>
+      <div class="admin-video-actions">
+        <button class="secondary-btn" type="button" data-edit-video="${escapeAttribute(video.id)}">Editar datos</button>
+        <button class="secondary-btn" type="button" data-toggle-video="${escapeAttribute(video.id)}">${video.active ? "Desactivar" : "Activar"}</button>
+      </div>
+    `;
+    card.querySelector("[data-edit-video]").addEventListener("click", () => editAdminVideo(video.id));
+    card.querySelector("[data-toggle-video]").addEventListener("click", () => toggleAdminVideo(video.id));
+    dom.adminVideoList.appendChild(card);
+  });
+}
+
+function startNewVideoForm() {
+  resetVideoForm();
+  dom.videoAdminForm.classList.remove("hidden");
+  dom.adminVideoCode.focus();
+}
+
+function editAdminVideo(videoId) {
+  const video = state.adminVideos.find((item) => item.id === videoId);
+  if (!video) return;
+  dom.adminVideoId.value = video.id;
+  dom.adminVideoCategory.value = video.category_id || "";
+  dom.adminVideoCode.value = getVideoCode(video);
+  dom.adminVideoTitle.value = video.title || "";
+  dom.adminVideoDescription.value = video.description || "";
+  dom.adminVideoFilePath.value = video.file_path || "";
+  dom.adminVideoOrder.value = Number(video.sort_order || 0);
+  dom.adminVideoActive.checked = Boolean(video.active);
+  dom.videoAdminForm.classList.remove("hidden");
+  dom.videoAdminForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function resetVideoForm() {
+  dom.videoAdminForm.reset();
+  dom.adminVideoId.value = "";
+  dom.adminVideoOrder.value = 0;
+  dom.adminVideoActive.checked = true;
+  if (state.categories[0]) dom.adminVideoCategory.value = state.categories[0].id;
+  dom.videoAdminForm.classList.add("hidden");
+}
+
+async function saveAdminVideo(event) {
+  event.preventDefault();
+  if (!requireSupabase()) return;
+  if (!dom.adminVideoCategory.value) {
+    showAlert("Debe existir al menos una categoria para guardar una capacitacion.");
+    return;
+  }
+
+  const id = dom.adminVideoId.value;
+  const payload = {
+    category_id: dom.adminVideoCategory.value,
+    video_code: dom.adminVideoCode.value.trim(),
+    title: dom.adminVideoTitle.value.trim(),
+    description: dom.adminVideoDescription.value.trim(),
+    file_path: dom.adminVideoFilePath.value.trim(),
+    sort_order: Number(dom.adminVideoOrder.value || 0),
+    active: dom.adminVideoActive.checked,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!payload.video_code || !payload.title || !payload.file_path) {
+    showAlert("Complete codigo, titulo y file_path para guardar la capacitacion.");
+    return;
+  }
+
+  const request = id
+    ? state.supabase.from("ehs_training_videos").update(payload).eq("id", id)
+    : state.supabase.from("ehs_training_videos").insert(payload);
+
+  const { error } = await request;
+  if (error) {
+    showAlert(`No se pudo guardar la capacitacion. Revise permisos RLS para insert/update en ehs_training_videos. Detalle: ${error.message}`);
+    return;
+  }
+
+  resetVideoForm();
+  await Promise.all([loadVideos(), loadAdminVideos()]);
+  populateVideoFilter();
+  renderLearnerExperience();
+}
+
+async function toggleAdminVideo(videoId) {
+  if (!requireSupabase()) return;
+  const video = state.adminVideos.find((item) => item.id === videoId);
+  if (!video) return;
+
+  const { error } = await state.supabase
+    .from("ehs_training_videos")
+    .update({ active: !video.active, updated_at: new Date().toISOString() })
+    .eq("id", videoId);
+
+  if (error) {
+    showAlert(`No se pudo cambiar el estado del video. Revise permisos RLS para update en ehs_training_videos. Detalle: ${error.message}`);
+    return;
+  }
+
+  await Promise.all([loadVideos(), loadAdminVideos()]);
+  renderLearnerExperience();
+}
+
 function setFormBusy(isBusy) {
   dom.employeeForm.querySelectorAll("input, button").forEach((el) => {
     el.disabled = isBusy;
@@ -559,13 +864,14 @@ function setFormBusy(isBusy) {
 
 function requireSupabase(show = true) {
   const ready = Boolean(state.supabase);
-  if (!ready && show) showAlert("Supabase no está disponible. Revise SUPABASE_ANON_KEY en app.js y la conexión de red.");
+  if (!ready && show) showAlert("Supabase no esta disponible. Revise la conexion de red y la anon key configurada.");
   return ready;
 }
 
 function showAlert(message) {
   dom.appAlert.textContent = message;
   dom.appAlert.classList.remove("hidden");
+  dom.appAlert.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function clearAlert() {
