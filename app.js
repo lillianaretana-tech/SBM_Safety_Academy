@@ -14,6 +14,7 @@ const state = {
   localProgress: {},
   progressSync: {},
   currentVideo: null,
+  externalPlayer: null,
   adminRows: [],
   adminVideos: [],
   adminAuthenticated: false
@@ -57,6 +58,8 @@ function cacheDom() {
     viewerTitle: document.getElementById("viewerTitle"),
     viewerDescription: document.getElementById("viewerDescription"),
     trainingPlayer: document.getElementById("trainingPlayer"),
+    externalPlayerWrap: document.getElementById("externalPlayerWrap"),
+    externalPlayer: document.getElementById("externalPlayer"),
     viewerProgressBar: document.getElementById("viewerProgressBar"),
     viewerProgressText: document.getElementById("viewerProgressText"),
     completeVideoBtn: document.getElementById("completeVideoBtn"),
@@ -100,37 +103,37 @@ function cacheDom() {
 }
 
 function bindEvents() {
-  dom.employeeForm.addEventListener("submit", saveEmployee);
-  dom.changeUserBtn.addEventListener("click", changeUser);
-  dom.reloadBtn.addEventListener("click", refreshAll);
-  dom.continueNextBtn.addEventListener("click", openNextVideo);
-  dom.backToLibraryBtn.addEventListener("click", closeVideoViewer);
-  dom.trainingPlayer.addEventListener("loadedmetadata", restoreCurrentVideoPosition);
-  dom.trainingPlayer.addEventListener("play", () => startVideo(state.currentVideo?.id));
-  dom.trainingPlayer.addEventListener("timeupdate", handleCurrentVideoProgress);
-  dom.trainingPlayer.addEventListener("pause", syncCurrentVideoProgress);
-  dom.trainingPlayer.addEventListener("ended", () => handleCurrentVideoProgress(true));
-  dom.trainingPlayer.addEventListener("error", () => {
+  on(dom.employeeForm, "submit", saveEmployee);
+  on(dom.changeUserBtn, "click", changeUser);
+  on(dom.reloadBtn, "click", refreshAll);
+  on(dom.continueNextBtn, "click", openNextVideo);
+  on(dom.backToLibraryBtn, "click", closeVideoViewer);
+  on(dom.trainingPlayer, "loadedmetadata", restoreCurrentVideoPosition);
+  on(dom.trainingPlayer, "play", () => startVideo(state.currentVideo?.id));
+  on(dom.trainingPlayer, "timeupdate", handleCurrentVideoProgress);
+  on(dom.trainingPlayer, "pause", syncCurrentVideoProgress);
+  on(dom.trainingPlayer, "ended", () => handleCurrentVideoProgress(true));
+  on(dom.trainingPlayer, "error", () => {
     if (!state.currentVideo) return;
     showAlert(`El video ${getVideoCode(state.currentVideo)} no se pudo reproducir. Use "Abrir video en pestana nueva" o revise la ruta exacta en GitHub/Supabase.`);
   });
-  dom.completeVideoBtn.addEventListener("click", completeCurrentVideo);
-  dom.adminOpenBtn.addEventListener("click", openAdmin);
-  dom.adminCloseBtn.addEventListener("click", closeAdmin);
-  dom.adminModal.addEventListener("click", (event) => {
+  on(dom.completeVideoBtn, "click", completeCurrentVideo);
+  on(dom.adminOpenBtn, "click", openAdmin);
+  on(dom.adminCloseBtn, "click", closeAdmin);
+  on(dom.adminModal, "click", (event) => {
     if (event.target === dom.adminModal) closeAdmin();
   });
-  dom.adminPinForm.addEventListener("submit", unlockAdmin);
-  dom.adminRecordsTab.addEventListener("click", () => setAdminTab("records"));
-  dom.adminVideosTab.addEventListener("click", () => setAdminTab("videos"));
+  on(dom.adminPinForm, "submit", unlockAdmin);
+  on(dom.adminRecordsTab, "click", () => setAdminTab("records"));
+  on(dom.adminVideosTab, "click", () => setAdminTab("videos"));
   [dom.filterPerson, dom.filterProject, dom.filterVideo].forEach((control) => {
-    control.addEventListener("input", renderAdminRows);
-    control.addEventListener("change", renderAdminRows);
+    on(control, "input", renderAdminRows);
+    on(control, "change", renderAdminRows);
   });
-  dom.exportCsvBtn.addEventListener("click", exportCsv);
-  dom.newVideoBtn.addEventListener("click", startNewVideoForm);
-  dom.cancelVideoEditBtn.addEventListener("click", resetVideoForm);
-  dom.videoAdminForm.addEventListener("submit", saveAdminVideo);
+  on(dom.exportCsvBtn, "click", exportCsv);
+  on(dom.newVideoBtn, "click", startNewVideoForm);
+  on(dom.cancelVideoEditBtn, "click", resetVideoForm);
+  on(dom.videoAdminForm, "submit", saveAdminVideo);
 }
 
 async function boot() {
@@ -208,10 +211,12 @@ function changeUser() {
   state.views = new Map();
   state.localProgress = {};
   state.currentVideo = null;
-  dom.trainingPlayer.pause();
-  dom.trainingPlayer.removeAttribute("src");
-  dom.trainingPlayer.load();
-  dom.employeeForm.reset();
+  if (dom.trainingPlayer) {
+    dom.trainingPlayer.pause();
+    dom.trainingPlayer.removeAttribute("src");
+    dom.trainingPlayer.load();
+  }
+  if (dom.employeeForm) dom.employeeForm.reset();
   renderLearnerExperience();
 }
 
@@ -270,19 +275,19 @@ function renderLearnerExperience() {
 
 function updateSession() {
   const hasEmployee = Boolean(state.employee);
-  dom.registerPanel.classList.toggle("hidden", hasEmployee);
-  dom.learnerArea.classList.toggle("hidden", !hasEmployee);
+  toggleHidden(dom.registerPanel, hasEmployee);
+  toggleHidden(dom.learnerArea, !hasEmployee);
 
   if (!hasEmployee) {
-    dom.sessionBadge.textContent = "Sin registro";
-    dom.sessionBadge.className = "status-pill pending";
+    setText(dom.sessionBadge, "Sin registro");
+    setClassName(dom.sessionBadge, "status-pill pending");
     return;
   }
 
-  dom.sessionBadge.textContent = `Registrado: ${state.employee.full_name}`;
-  dom.sessionBadge.className = "status-pill completed";
-  dom.learnerName.textContent = state.employee.full_name || "colaborador";
-  dom.learnerProject.textContent = `Proyecto: ${state.employee.project_site || "--"}`;
+  setText(dom.sessionBadge, `Registrado: ${state.employee.full_name}`);
+  setClassName(dom.sessionBadge, "status-pill completed");
+  setText(dom.learnerName, state.employee.full_name || "colaborador");
+  setText(dom.learnerProject, `Proyecto: ${state.employee.project_site || "--"}`);
 }
 
 function renderProgress() {
@@ -291,21 +296,21 @@ function renderProgress() {
   const pending = Math.max(0, total - completed);
   const percent = total ? Math.round((completed / total) * 100) : 0;
 
-  dom.metricPercent.textContent = `${percent}%`;
-  dom.metricCompleted.textContent = `${completed} de ${total}`;
-  dom.metricPending.textContent = `${pending}`;
-  dom.progressSummary.textContent = `${completed} de ${total} completados`;
-  dom.progressBar.style.width = `${percent}%`;
-  dom.completionPanel.classList.toggle("hidden", !(total > 0 && completed === total));
+  setText(dom.metricPercent, `${percent}%`);
+  setText(dom.metricCompleted, `${completed} de ${total}`);
+  setText(dom.metricPending, `${pending}`);
+  setText(dom.progressSummary, `${completed} de ${total} completados`);
+  setWidth(dom.progressBar, `${percent}%`);
+  toggleHidden(dom.completionPanel, !(total > 0 && completed === total));
 }
 
 function renderNextTraining() {
   const next = getNextPendingVideo();
-  dom.nextTrainingPanel.classList.toggle("hidden", !next);
+  toggleHidden(dom.nextTrainingPanel, !next);
   if (!next) return;
-  dom.nextTitle.textContent = `${getVideoCode(next)} - ${next.title || "Capacitacion"}`;
-  dom.nextDescription.textContent = next.description || "Continua con la siguiente capacitacion pendiente de tu ruta.";
-  dom.continueNextBtn.disabled = false;
+  setText(dom.nextTitle, `${getVideoCode(next)} - ${next.title || "Capacitacion"}`);
+  setText(dom.nextDescription, next.description || "Continua con la siguiente capacitacion pendiente de tu ruta.");
+  if (dom.continueNextBtn) dom.continueNextBtn.disabled = false;
 }
 
 function getNextPendingVideo() {
@@ -318,8 +323,9 @@ function openNextVideo() {
 }
 
 function renderVideoLibrary() {
+  if (!dom.videoList) return;
   dom.videoList.innerHTML = "";
-  dom.emptyState.classList.toggle("hidden", state.videos.length > 0);
+  toggleHidden(dom.emptyState, state.videos.length > 0);
 
   state.videos.forEach((video) => {
     const view = state.views.get(video.id);
@@ -358,17 +364,28 @@ function openVideo(videoId) {
     return;
   }
   state.currentVideo = video;
-  dom.videoViewer.classList.remove("hidden");
-  dom.trainingPlayer.src = video.file_path || "";
-  dom.trainingPlayer.load();
+  toggleHidden(dom.videoViewer, false);
+  resetExternalPlayer();
+  if (isExternalVideo(video.file_path)) {
+    toggleHidden(dom.trainingPlayer, true);
+    toggleHidden(dom.externalPlayerWrap, false);
+    if (dom.externalPlayer) dom.externalPlayer.src = getExternalEmbedUrl(video.file_path);
+    setupExternalPlayer(video);
+  } else if (dom.trainingPlayer) {
+    toggleHidden(dom.trainingPlayer, false);
+    toggleHidden(dom.externalPlayerWrap, true);
+    dom.trainingPlayer.src = video.file_path || "";
+    dom.trainingPlayer.load();
+  }
   updateCurrentViewer();
-  dom.videoViewer.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (dom.videoViewer) dom.videoViewer.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function closeVideoViewer() {
   syncCurrentVideoProgress();
-  dom.trainingPlayer.pause();
-  dom.videoViewer.classList.add("hidden");
+  if (dom.trainingPlayer) dom.trainingPlayer.pause();
+  resetExternalPlayer();
+  toggleHidden(dom.videoViewer, true);
 }
 
 function updateCurrentViewer() {
@@ -379,16 +396,18 @@ function updateCurrentViewer() {
   const progress = getVideoProgress(video.id, view);
   const status = getStatus(progress, view);
 
-  dom.viewerStatus.className = `status-pill ${status.className}`;
-  dom.viewerStatus.textContent = status.label;
-  dom.viewerCategory.textContent = getCategoryName(video);
-  dom.viewerTitle.textContent = `${getVideoCode(video)} - ${video.title || "Capacitacion"}`;
-  dom.viewerDescription.textContent = video.description || "Sin descripcion.";
-  dom.openVideoLink.href = video.file_path || "#";
-  dom.viewerProgressBar.style.width = `${Math.min(100, Math.round(progress))}%`;
-  dom.viewerProgressText.textContent = `Avance visto: ${Math.round(progress)}%. Debe llegar al 95% para completar.`;
-  dom.completeVideoBtn.disabled = !isCompleteButtonEnabled(progress, view);
-  dom.completeVideoBtn.textContent = view?.completed ? "Completado" : "Marcar como completado";
+  setClassName(dom.viewerStatus, `status-pill ${status.className}`);
+  setText(dom.viewerStatus, status.label);
+  setText(dom.viewerCategory, getCategoryName(video));
+  setText(dom.viewerTitle, `${getVideoCode(video)} - ${video.title || "Capacitacion"}`);
+  setText(dom.viewerDescription, video.description || "Sin descripcion.");
+  if (dom.openVideoLink) dom.openVideoLink.href = video.file_path || "#";
+  setWidth(dom.viewerProgressBar, `${Math.min(100, Math.round(progress))}%`);
+  setText(dom.viewerProgressText, `Avance visto: ${Math.round(progress)}%. Debe llegar al 95% para completar.`);
+  if (dom.completeVideoBtn) {
+    dom.completeVideoBtn.disabled = !isCompleteButtonEnabled(progress, view);
+    dom.completeVideoBtn.textContent = view?.completed ? "Completado" : "Marcar como completado";
+  }
 }
 
 async function startVideo(videoId) {
@@ -429,8 +448,25 @@ function handleCurrentVideoProgress(forceComplete = false) {
   syncPartialProgress(video.id, nextProgress, forceComplete === true);
 }
 
+function handleExternalVideoProgress(progress, forceComplete = false) {
+  const video = state.currentVideo;
+  if (!video) return;
+  const nextProgress = forceComplete === true ? 100 : Math.min(100, progress);
+  if (!state.localProgress[video.id] || nextProgress > state.localProgress[video.id]) {
+    state.localProgress[video.id] = nextProgress;
+    saveLocalProgress();
+  }
+  updateCurrentViewer();
+  renderVideoLibrary();
+  syncPartialProgress(video.id, nextProgress, forceComplete === true);
+}
+
 function syncCurrentVideoProgress() {
   const video = state.currentVideo;
+  if (video && isExternalVideo(video.file_path)) {
+    syncPartialProgress(video.id, getVideoProgress(video.id), true);
+    return;
+  }
   const player = dom.trainingPlayer;
   if (!video || !player.duration || Number.isNaN(player.duration)) return;
   const percent = Math.min(100, (player.currentTime / player.duration) * 100);
@@ -439,6 +475,7 @@ function syncCurrentVideoProgress() {
 
 function restoreCurrentVideoPosition() {
   const video = state.currentVideo;
+  if (video && isExternalVideo(video.file_path)) return;
   const player = dom.trainingPlayer;
   if (!video || !player.duration || Number.isNaN(player.duration)) return;
 
@@ -449,6 +486,41 @@ function restoreCurrentVideoPosition() {
 
   const resumeAt = Math.max(0, ((progress / 100) * player.duration) - 5);
   if (resumeAt > 0 && resumeAt < player.duration) player.currentTime = resumeAt;
+}
+
+function setupExternalPlayer(video) {
+  if (!dom.externalPlayer) return;
+  startVideo(video.id);
+
+  if (!window.Vimeo || !window.Vimeo.Player) {
+    showAlert("No se pudo cargar Vimeo Player API. Puede abrir el video en pestana nueva.");
+    return;
+  }
+
+  state.externalPlayer = new window.Vimeo.Player(dom.externalPlayer);
+  state.externalPlayer.on("play", () => startVideo(video.id));
+  state.externalPlayer.on("timeupdate", (data) => {
+    handleExternalVideoProgress(Number(data.percent || 0) * 100);
+  });
+  state.externalPlayer.on("pause", () => syncPartialProgress(video.id, getVideoProgress(video.id), true));
+  state.externalPlayer.on("ended", () => handleExternalVideoProgress(100, true));
+  state.externalPlayer.ready().then(async () => {
+    const progress = getVideoProgress(video.id);
+    if (progress >= 2 && progress < 95) {
+      const duration = await state.externalPlayer.getDuration();
+      await state.externalPlayer.setCurrentTime(Math.max(0, ((progress / 100) * duration) - 5));
+    }
+  }).catch(() => {
+    showAlert("No se pudo inicializar el reproductor Vimeo. Use el enlace para abrirlo en una pestana nueva.");
+  });
+}
+
+function resetExternalPlayer() {
+  if (state.externalPlayer && typeof state.externalPlayer.unload === "function") {
+    state.externalPlayer.unload().catch(() => {});
+  }
+  state.externalPlayer = null;
+  if (dom.externalPlayer) dom.externalPlayer.removeAttribute("src");
 }
 
 async function syncPartialProgress(videoId, progress, force = false) {
@@ -542,6 +614,21 @@ function getCategoryName(video) {
   return video?.ehs_training_categories?.name || state.categories.find((item) => item.id === video?.category_id)?.name || "EHS";
 }
 
+function isExternalVideo(filePath) {
+  return /^https?:\/\//i.test(String(filePath || ""));
+}
+
+function getExternalEmbedUrl(filePath) {
+  const value = String(filePath || "");
+  const vimeoMatch = value.match(/vimeo\.com\/(\d+)(?:\/([A-Za-z0-9]+))?/i);
+  if (vimeoMatch) {
+    const id = vimeoMatch[1];
+    const hash = vimeoMatch[2] ? `?h=${encodeURIComponent(vimeoMatch[2])}` : "";
+    return `https://player.vimeo.com/video/${id}${hash}`;
+  }
+  return value;
+}
+
 function getStatus(progress, view) {
   if (view?.completed) return { label: "Completado", className: "completed" };
   if (progress > 0) return { label: "En progreso", className: "in-progress" };
@@ -566,13 +653,13 @@ function progressStorageKey() {
 }
 
 async function openAdmin() {
-  dom.adminModal.classList.remove("hidden");
-  dom.adminPin.focus();
+  toggleHidden(dom.adminModal, false);
+  if (dom.adminPin) dom.adminPin.focus();
   if (state.adminAuthenticated) await loadAdminData();
 }
 
 function closeAdmin() {
-  dom.adminModal.classList.add("hidden");
+  toggleHidden(dom.adminModal, true);
 }
 
 async function unlockAdmin(event) {
@@ -582,17 +669,17 @@ async function unlockAdmin(event) {
     return;
   }
   state.adminAuthenticated = true;
-  dom.adminPinForm.classList.add("hidden");
-  dom.adminContent.classList.remove("hidden");
+  toggleHidden(dom.adminPinForm, true);
+  toggleHidden(dom.adminContent, false);
   await loadAdminData();
 }
 
 function setAdminTab(tab) {
   const isRecords = tab === "records";
-  dom.adminRecordsTab.classList.toggle("active", isRecords);
-  dom.adminVideosTab.classList.toggle("active", !isRecords);
-  dom.adminRecordsPanel.classList.toggle("hidden", !isRecords);
-  dom.adminVideosPanel.classList.toggle("hidden", isRecords);
+  toggleClass(dom.adminRecordsTab, "active", isRecords);
+  toggleClass(dom.adminVideosTab, "active", !isRecords);
+  toggleHidden(dom.adminRecordsPanel, !isRecords);
+  toggleHidden(dom.adminVideosPanel, isRecords);
 }
 
 async function loadAdminData() {
@@ -638,12 +725,13 @@ async function loadAdminVideos() {
 function renderAdminSummary() {
   const total = state.adminRows.length;
   const completed = state.adminRows.filter((row) => row.completed).length;
-  dom.adminTotalViews.textContent = total;
-  dom.adminCompletedViews.textContent = completed;
-  dom.adminPendingViews.textContent = Math.max(0, total - completed);
+  setText(dom.adminTotalViews, total);
+  setText(dom.adminCompletedViews, completed);
+  setText(dom.adminPendingViews, Math.max(0, total - completed));
 }
 
 function populateVideoFilter() {
+  if (!dom.filterVideo) return;
   const current = dom.filterVideo.value;
   const options = new Map();
   [...state.videos, ...state.adminVideos].forEach((video) => {
@@ -678,6 +766,7 @@ function getFilteredAdminRows() {
 
 function renderAdminRows() {
   const rows = getFilteredAdminRows();
+  if (!dom.adminRows) return;
   dom.adminRows.innerHTML = "";
   rows.forEach((row) => {
     const employee = row.ehs_employees || {};
@@ -693,7 +782,7 @@ function renderAdminRows() {
     `;
     dom.adminRows.appendChild(tr);
   });
-  dom.adminEmpty.classList.toggle("hidden", rows.length > 0);
+  toggleHidden(dom.adminEmpty, rows.length > 0);
 }
 
 function exportCsv() {
@@ -723,6 +812,7 @@ function exportCsv() {
 }
 
 function populateCategorySelect() {
+  if (!dom.adminVideoCategory) return;
   dom.adminVideoCategory.innerHTML = "";
   state.categories.forEach((category) => {
     const option = document.createElement("option");
@@ -739,8 +829,9 @@ function populateCategorySelect() {
 }
 
 function renderAdminVideos() {
+  if (!dom.adminVideoList) return;
   dom.adminVideoList.innerHTML = "";
-  dom.adminVideoEmpty.classList.toggle("hidden", state.adminVideos.length > 0);
+  toggleHidden(dom.adminVideoEmpty, state.adminVideos.length > 0);
 
   state.adminVideos.forEach((video) => {
     const card = document.createElement("article");
@@ -768,8 +859,8 @@ function renderAdminVideos() {
 
 function startNewVideoForm() {
   resetVideoForm();
-  dom.videoAdminForm.classList.remove("hidden");
-  dom.adminVideoCode.focus();
+  toggleHidden(dom.videoAdminForm, false);
+  if (dom.adminVideoCode) dom.adminVideoCode.focus();
 }
 
 function editAdminVideo(videoId) {
@@ -783,17 +874,17 @@ function editAdminVideo(videoId) {
   dom.adminVideoFilePath.value = video.file_path || "";
   dom.adminVideoOrder.value = Number(video.sort_order || 0);
   dom.adminVideoActive.checked = Boolean(video.active);
-  dom.videoAdminForm.classList.remove("hidden");
-  dom.videoAdminForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  toggleHidden(dom.videoAdminForm, false);
+  if (dom.videoAdminForm) dom.videoAdminForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function resetVideoForm() {
-  dom.videoAdminForm.reset();
-  dom.adminVideoId.value = "";
-  dom.adminVideoOrder.value = 0;
-  dom.adminVideoActive.checked = true;
-  if (state.categories[0]) dom.adminVideoCategory.value = state.categories[0].id;
-  dom.videoAdminForm.classList.add("hidden");
+  if (dom.videoAdminForm) dom.videoAdminForm.reset();
+  if (dom.adminVideoId) dom.adminVideoId.value = "";
+  if (dom.adminVideoOrder) dom.adminVideoOrder.value = 0;
+  if (dom.adminVideoActive) dom.adminVideoActive.checked = true;
+  if (state.categories[0] && dom.adminVideoCategory) dom.adminVideoCategory.value = state.categories[0].id;
+  toggleHidden(dom.videoAdminForm, true);
 }
 
 async function saveAdminVideo(event) {
@@ -857,6 +948,7 @@ async function toggleAdminVideo(videoId) {
 }
 
 function setFormBusy(isBusy) {
+  if (!dom.employeeForm) return;
   dom.employeeForm.querySelectorAll("input, button").forEach((el) => {
     el.disabled = isBusy;
   });
@@ -869,14 +961,42 @@ function requireSupabase(show = true) {
 }
 
 function showAlert(message) {
+  if (!dom.appAlert) {
+    console.error(message);
+    return;
+  }
   dom.appAlert.textContent = message;
   dom.appAlert.classList.remove("hidden");
   dom.appAlert.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function clearAlert() {
-  dom.appAlert.textContent = "";
-  dom.appAlert.classList.add("hidden");
+  setText(dom.appAlert, "");
+  toggleHidden(dom.appAlert, true);
+}
+
+function on(element, eventName, handler) {
+  if (element) element.addEventListener(eventName, handler);
+}
+
+function setText(element, value) {
+  if (element) element.textContent = value;
+}
+
+function setClassName(element, value) {
+  if (element) element.className = value;
+}
+
+function setWidth(element, value) {
+  if (element) element.style.width = value;
+}
+
+function toggleHidden(element, shouldHide) {
+  toggleClass(element, "hidden", shouldHide);
+}
+
+function toggleClass(element, className, force) {
+  if (element) element.classList.toggle(className, force);
 }
 
 function safeJsonParse(value, fallback) {

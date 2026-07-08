@@ -6,6 +6,7 @@
   <title>SBM Safety Academy</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://player.vimeo.com/api/player.js"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -117,6 +118,9 @@
           <p id="viewerDescription" class="muted"></p>
         </div>
         <video id="trainingPlayer" class="training-video" controls preload="metadata" playsinline></video>
+        <div id="externalPlayerWrap" class="external-player-wrap hidden">
+          <iframe id="externalPlayer" class="external-player" title="Video externo" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+        </div>
         <div class="viewer-progress">
           <div class="progress-track" aria-hidden="true">
             <div id="viewerProgressBar" class="progress-bar"></div>
