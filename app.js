@@ -14,7 +14,6 @@ const state = {
   localProgress: {},
   progressSync: {},
   currentVideo: null,
-  externalPlayer: null,
   adminRows: [],
   adminVideos: [],
   adminAuthenticated: false
@@ -59,11 +58,12 @@ function cacheDom() {
     viewerDescription: document.getElementById("viewerDescription"),
     trainingPlayer: document.getElementById("trainingPlayer"),
     externalPlayerWrap: document.getElementById("externalPlayerWrap"),
-    externalPlayer: document.getElementById("externalPlayer"),
+    externalOpenLink: document.getElementById("externalOpenLink"),
     viewerProgressBar: document.getElementById("viewerProgressBar"),
     viewerProgressText: document.getElementById("viewerProgressText"),
     completeVideoBtn: document.getElementById("completeVideoBtn"),
     openVideoLink: document.getElementById("openVideoLink"),
+    viewerSignatureNote: document.getElementById("viewerSignatureNote"),
     videoList: document.getElementById("videoList"),
     emptyState: document.getElementById("emptyState"),
     reloadBtn: document.getElementById("reloadBtn"),
@@ -369,8 +369,9 @@ function openVideo(videoId) {
   if (isExternalVideo(video.file_path)) {
     toggleHidden(dom.trainingPlayer, true);
     toggleHidden(dom.externalPlayerWrap, false);
-    if (dom.externalPlayer) dom.externalPlayer.src = getExternalEmbedUrl(video.file_path);
-    setupExternalPlayer(video);
+    if (dom.externalOpenLink) dom.externalOpenLink.href = video.file_path || "#";
+    startVideo(video.id);
+    window.open(video.file_path, "_blank", "noopener");
   } else if (dom.trainingPlayer) {
     toggleHidden(dom.trainingPlayer, false);
     toggleHidden(dom.externalPlayerWrap, true);
@@ -403,9 +404,19 @@ function updateCurrentViewer() {
   setText(dom.viewerDescription, video.description || "Sin descripcion.");
   if (dom.openVideoLink) dom.openVideoLink.href = video.file_path || "#";
   setWidth(dom.viewerProgressBar, `${Math.min(100, Math.round(progress))}%`);
-  setText(dom.viewerProgressText, `Avance visto: ${Math.round(progress)}%. Debe llegar al 95% para completar.`);
+  if (isExternalVideo(video.file_path) && !view?.completed) {
+    setText(dom.viewerProgressText, "Video externo: se abre en una pestana nueva. Al terminar de verlo, regrese y marque como completado.");
+  } else {
+    setText(dom.viewerProgressText, `Avance visto: ${Math.round(progress)}%. Debe llegar al 95% para completar.`);
+  }
+  setText(
+    dom.viewerSignatureNote,
+    isExternalVideo(video.file_path)
+      ? "El registro digital no sustituye la firma fisica. Estos videos Vimeo pueden firmarse juntos en una hoja regular de capacitacion."
+      : "El registro digital no sustituye la firma fisica. Debe firmar RH-F-05."
+  );
   if (dom.completeVideoBtn) {
-    dom.completeVideoBtn.disabled = !isCompleteButtonEnabled(progress, view);
+    dom.completeVideoBtn.disabled = isExternalVideo(video.file_path) ? Boolean(view?.completed) : !isCompleteButtonEnabled(progress, view);
     dom.completeVideoBtn.textContent = view?.completed ? "Completado" : "Marcar como completado";
   }
 }
@@ -448,19 +459,6 @@ function handleCurrentVideoProgress(forceComplete = false) {
   syncPartialProgress(video.id, nextProgress, forceComplete === true);
 }
 
-function handleExternalVideoProgress(progress, forceComplete = false) {
-  const video = state.currentVideo;
-  if (!video) return;
-  const nextProgress = forceComplete === true ? 100 : Math.min(100, progress);
-  if (!state.localProgress[video.id] || nextProgress > state.localProgress[video.id]) {
-    state.localProgress[video.id] = nextProgress;
-    saveLocalProgress();
-  }
-  updateCurrentViewer();
-  renderVideoLibrary();
-  syncPartialProgress(video.id, nextProgress, forceComplete === true);
-}
-
 function syncCurrentVideoProgress() {
   const video = state.currentVideo;
   if (video && isExternalVideo(video.file_path)) {
@@ -488,39 +486,8 @@ function restoreCurrentVideoPosition() {
   if (resumeAt > 0 && resumeAt < player.duration) player.currentTime = resumeAt;
 }
 
-function setupExternalPlayer(video) {
-  if (!dom.externalPlayer) return;
-  startVideo(video.id);
-
-  if (!window.Vimeo || !window.Vimeo.Player) {
-    showAlert("No se pudo cargar Vimeo Player API. Puede abrir el video en pestana nueva.");
-    return;
-  }
-
-  state.externalPlayer = new window.Vimeo.Player(dom.externalPlayer);
-  state.externalPlayer.on("play", () => startVideo(video.id));
-  state.externalPlayer.on("timeupdate", (data) => {
-    handleExternalVideoProgress(Number(data.percent || 0) * 100);
-  });
-  state.externalPlayer.on("pause", () => syncPartialProgress(video.id, getVideoProgress(video.id), true));
-  state.externalPlayer.on("ended", () => handleExternalVideoProgress(100, true));
-  state.externalPlayer.ready().then(async () => {
-    const progress = getVideoProgress(video.id);
-    if (progress >= 2 && progress < 95) {
-      const duration = await state.externalPlayer.getDuration();
-      await state.externalPlayer.setCurrentTime(Math.max(0, ((progress / 100) * duration) - 5));
-    }
-  }).catch(() => {
-    showAlert("No se pudo inicializar el reproductor Vimeo. Use el enlace para abrirlo en una pestana nueva.");
-  });
-}
-
 function resetExternalPlayer() {
-  if (state.externalPlayer && typeof state.externalPlayer.unload === "function") {
-    state.externalPlayer.unload().catch(() => {});
-  }
-  state.externalPlayer = null;
-  if (dom.externalPlayer) dom.externalPlayer.removeAttribute("src");
+  if (dom.externalOpenLink) dom.externalOpenLink.href = "#";
 }
 
 async function syncPartialProgress(videoId, progress, force = false) {
@@ -616,17 +583,6 @@ function getCategoryName(video) {
 
 function isExternalVideo(filePath) {
   return /^https?:\/\//i.test(String(filePath || ""));
-}
-
-function getExternalEmbedUrl(filePath) {
-  const value = String(filePath || "");
-  const vimeoMatch = value.match(/vimeo\.com\/(\d+)(?:\/([A-Za-z0-9]+))?/i);
-  if (vimeoMatch) {
-    const id = vimeoMatch[1];
-    const hash = vimeoMatch[2] ? `?h=${encodeURIComponent(vimeoMatch[2])}` : "";
-    return `https://player.vimeo.com/video/${id}${hash}`;
-  }
-  return value;
 }
 
 function getStatus(progress, view) {

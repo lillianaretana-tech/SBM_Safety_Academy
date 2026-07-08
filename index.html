@@ -6,7 +6,6 @@
   <title>SBM Safety Academy</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://player.vimeo.com/api/player.js"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -119,7 +118,11 @@
         </div>
         <video id="trainingPlayer" class="training-video" controls preload="metadata" playsinline></video>
         <div id="externalPlayerWrap" class="external-player-wrap hidden">
-          <iframe id="externalPlayer" class="external-player" title="Video externo" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+          <div class="external-open-panel">
+            <p>Esta capacitacion se abre en Vimeo en una pestana nueva.</p>
+            <a id="externalOpenLink" class="primary-btn" href="#" target="_blank" rel="noopener">Abrir video en Vimeo</a>
+            <p class="muted">Cuando termine de verlo, regrese a esta pantalla para registrar el avance. Estos videos pueden firmarse juntos en una hoja regular de capacitacion.</p>
+          </div>
         </div>
         <div class="viewer-progress">
           <div class="progress-track" aria-hidden="true">
@@ -131,7 +134,7 @@
           <button id="completeVideoBtn" class="primary-btn" type="button" disabled>Marcar como completado</button>
           <a id="openVideoLink" class="secondary-btn" href="#" target="_blank" rel="noopener">Abrir video en pestana nueva</a>
         </div>
-        <p class="signature-note">El registro digital no sustituye la firma fisica. Debe firmar RH-F-05.</p>
+        <p id="viewerSignatureNote" class="signature-note">El registro digital no sustituye la firma fisica. Debe firmar RH-F-05.</p>
       </section>
 
       <section aria-labelledby="libraryTitle">

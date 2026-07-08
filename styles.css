@@ -1,6 +1,6 @@
 :root {
-  --teal: #f15a24;
-  --teal-dark: #c9431a;
+  --teal: #d8642a;
+  --teal-dark: #9f4b24;
   --navy: #3f4448;
   --blue: #6c747b;
   --gray-50: #f7f8f8;
@@ -12,7 +12,7 @@
   --warning: #a96400;
   --danger: #b42318;
   --white: #ffffff;
-  --shadow: 0 14px 32px rgba(18, 50, 74, 0.1);
+  --shadow: 0 14px 32px rgba(38, 43, 47, 0.09);
 }
 
 * {
@@ -62,8 +62,8 @@ a {
 
 .app-header::before {
   display: block;
-  height: 5px;
-  background: linear-gradient(90deg, var(--teal), var(--navy));
+  height: 4px;
+  background: linear-gradient(90deg, var(--teal-dark), var(--navy));
   content: "";
 }
 
@@ -222,11 +222,11 @@ button,
 
 .primary-btn {
   color: var(--white);
-  background: var(--teal);
+  background: var(--navy);
 }
 
 .primary-btn:hover {
-  background: var(--teal-dark);
+  background: #1f2428;
 }
 
 .secondary-btn {
@@ -347,7 +347,7 @@ button:disabled {
 .next-panel {
   display: grid;
   gap: 14px;
-  border-left: 6px solid var(--teal);
+  border-left: 5px solid var(--teal);
 }
 
 .success-panel {
@@ -417,7 +417,7 @@ button:disabled {
 
 .category-chip {
   color: var(--teal-dark);
-  background: #fff0e9;
+  background: #f8eee9;
 }
 
 .video-card h3 {
@@ -462,11 +462,22 @@ button:disabled {
   aspect-ratio: 16 / 9;
 }
 
-.external-player {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  display: block;
+.external-open-panel {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  min-height: 100%;
+  padding: 22px;
+  color: var(--white);
+  text-align: center;
+}
+
+.external-open-panel p {
+  margin-bottom: 0;
+}
+
+.external-open-panel .muted {
+  color: #d9dddf;
 }
 
 .viewer-progress {

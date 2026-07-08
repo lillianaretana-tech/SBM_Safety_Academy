@@ -8,6 +8,7 @@ LMS mobile-first de microcapacitaciones EHS para colaboradores operativos de SBM
 - `styles.css`: diseno mobile-first con colores SBM.
 - `app.js`: registro, dashboard, progreso, reproductor, admin y gestion basica de capacitaciones.
 - `supabase_setup.sql`: estructura sugerida de tablas `ehs_*`, datos iniciales, RLS y policies.
+- `supabase_seed_q3_vimeo.sql`: carga opcional de videos Q3 desde Vimeo.
 - `assets/Logo_SBM.png`: logo usado en el encabezado y referencia visual de marca.
 
 ## Funcionalidad principal
@@ -17,6 +18,9 @@ LMS mobile-first de microcapacitaciones EHS para colaboradores operativos de SBM
 - Seccion `Tu siguiente capacitacion` con el primer video pendiente segun `sort_order`.
 - Biblioteca de videos con estado: pendiente, en progreso o completado.
 - Vista dedicada de video con reproductor de tamano controlado.
+- Soporte para MP4 locales en `/videos/` y enlaces externos Vimeo en `file_path`.
+- Los enlaces Vimeo se abren en una pestana nueva; al terminar, el colaborador regresa a la app para marcar completado.
+- Los videos Vimeo pueden firmarse juntos en una sola hoja regular de capacitacion.
 - Guardado de avance parcial en `ehs_video_views.progress_percent`.
 - Boton `Marcar como completado` habilitado solo al llegar al 95%.
 - Felicitacion al completar toda la ruta.
@@ -52,6 +56,12 @@ videos/EHS-I-24-Uso-de-estaciones-de-dilucion-y-piletas-de-lavado.mp4
 ```
 
 GitHub Pages distingue mayusculas, minusculas y guiones. El valor `file_path` de Supabase debe coincidir exactamente.
+
+## Videos Vimeo Q3
+
+El archivo `supabase_seed_q3_vimeo.sql` agrega una categoria Q3 y 13 videos externos. Los enlaces marcados como acceso `si` quedan activos; los marcados `no` quedan inactivos como prevista para activarlos cuando funcionen.
+
+Para liberar 2 videos por semana, use el panel administrador y active solamente los dos videos de esa semana. Tambien puede cambiar `active` directamente en Supabase.
 
 ## Panel administrador
 
