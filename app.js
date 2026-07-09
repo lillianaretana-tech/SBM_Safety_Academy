@@ -1,212 +1,1038 @@
-const STORAGE_KEY = "lillytech.asset.manager.v2";
-const LEGACY_STORAGE_KEY = "lillytech.asset.manager.v1";
-const BACKUP_KEY = "lillytech.asset.manager.lastBackup";
+const SUPABASE_URL = "https://vgkyoyosjewdygxtnqvu.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZna3lveW9zamV3ZHlneHRucXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NTAxNDAsImV4cCI6MjA5ODIyNjE0MH0.oDxSWg61UFLqMh2MeEW6yxarZAjobhEA6TWm0KS_7CA";
+const ADMIN_PIN = "2580";
 
-/* =====================================================================
-   CONFIGURACION SUPABASE  ->  PEGA AQUI TUS DOS DATOS
-   Los encuentras en: Supabase > Project Settings > API
-   - SUPABASE_URL  = "Project URL"
-   - SUPABASE_ANON_KEY = "anon public"
-   ===================================================================== */
-const SUPABASE_URL = "https://vtbqplzhyhboiindyind.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0YnFwbHpoeWhib2lpbmR5aW5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MDkzMzcsImV4cCI6MjA5NzQ4NTMzN30.YVhDdTBrZPj5N528D7yqH8NQmQP1RbrY8OEzJEHYS7o";
-const SUPABASE_TABLE = "lillytech_assets";
+const STORAGE_EMPLOYEE_KEY = "sbmSafetyAcademyEmployee";
+const STORAGE_PROGRESS_PREFIX = "sbmSafetyAcademyProgress:";
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-let currentUser = null;
+const state = {
+  supabase: null,
+  employee: null,
+  videos: [],
+  categories: [],
+  views: new Map(),
+  localProgress: {},
+  progressSync: {},
+  currentVideo: null,
+  adminRows: [],
+  adminVideos: [],
+  adminAuthenticated: false
+};
 
-// Indicador de estado de sincronizacion (esquina). Se crea solo.
-function syncStatus(text, kind = "ok") {
-  let el = document.getElementById("syncStatus");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "syncStatus";
-    el.style.cssText =
-      "position:fixed;bottom:16px;right:16px;z-index:9999;font:600 12px/1.4 Inter,sans-serif;" +
-      "padding:8px 14px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.35);transition:opacity .3s;";
-    document.body.appendChild(el);
+const dom = {};
+
+document.addEventListener("DOMContentLoaded", () => {
+  cacheDom();
+  bindEvents();
+  boot();
+});
+
+function cacheDom() {
+  Object.assign(dom, {
+    appAlert: document.getElementById("appAlert"),
+    registerPanel: document.getElementById("registerPanel"),
+    learnerArea: document.getElementById("learnerArea"),
+    employeeForm: document.getElementById("employeeForm"),
+    fullName: document.getElementById("fullName"),
+    cedula: document.getElementById("cedula"),
+    projectSite: document.getElementById("projectSite"),
+    sessionBadge: document.getElementById("sessionBadge"),
+    learnerName: document.getElementById("learnerName"),
+    learnerProject: document.getElementById("learnerProject"),
+    changeUserBtn: document.getElementById("changeUserBtn"),
+    metricPercent: document.getElementById("metricPercent"),
+    metricCompleted: document.getElementById("metricCompleted"),
+    metricPending: document.getElementById("metricPending"),
+    progressSummary: document.getElementById("progressSummary"),
+    progressBar: document.getElementById("progressBar"),
+    completionPanel: document.getElementById("completionPanel"),
+    nextTrainingPanel: document.getElementById("nextTrainingPanel"),
+    nextTitle: document.getElementById("nextTitle"),
+    nextDescription: document.getElementById("nextDescription"),
+    continueNextBtn: document.getElementById("continueNextBtn"),
+    videoViewer: document.getElementById("videoViewer"),
+    backToLibraryBtn: document.getElementById("backToLibraryBtn"),
+    viewerStatus: document.getElementById("viewerStatus"),
+    viewerCategory: document.getElementById("viewerCategory"),
+    viewerTitle: document.getElementById("viewerTitle"),
+    viewerDescription: document.getElementById("viewerDescription"),
+    trainingPlayer: document.getElementById("trainingPlayer"),
+    externalPlayerWrap: document.getElementById("externalPlayerWrap"),
+    externalOpenLink: document.getElementById("externalOpenLink"),
+    viewerProgressBar: document.getElementById("viewerProgressBar"),
+    viewerProgressText: document.getElementById("viewerProgressText"),
+    completeVideoBtn: document.getElementById("completeVideoBtn"),
+    openVideoLink: document.getElementById("openVideoLink"),
+    viewerSignatureNote: document.getElementById("viewerSignatureNote"),
+    videoList: document.getElementById("videoList"),
+    emptyState: document.getElementById("emptyState"),
+    reloadBtn: document.getElementById("reloadBtn"),
+    adminOpenBtn: document.getElementById("adminOpenBtn"),
+    adminModal: document.getElementById("adminModal"),
+    adminCloseBtn: document.getElementById("adminCloseBtn"),
+    adminPinForm: document.getElementById("adminPinForm"),
+    adminPin: document.getElementById("adminPin"),
+    adminContent: document.getElementById("adminContent"),
+    adminRecordsTab: document.getElementById("adminRecordsTab"),
+    adminVideosTab: document.getElementById("adminVideosTab"),
+    adminRecordsPanel: document.getElementById("adminRecordsPanel"),
+    adminVideosPanel: document.getElementById("adminVideosPanel"),
+    adminTotalViews: document.getElementById("adminTotalViews"),
+    adminCompletedViews: document.getElementById("adminCompletedViews"),
+    adminPendingViews: document.getElementById("adminPendingViews"),
+    filterPerson: document.getElementById("filterPerson"),
+    filterProject: document.getElementById("filterProject"),
+    filterVideo: document.getElementById("filterVideo"),
+    adminRows: document.getElementById("adminRows"),
+    adminEmpty: document.getElementById("adminEmpty"),
+    exportCsvBtn: document.getElementById("exportCsvBtn"),
+    newVideoBtn: document.getElementById("newVideoBtn"),
+    videoAdminForm: document.getElementById("videoAdminForm"),
+    adminVideoId: document.getElementById("adminVideoId"),
+    adminVideoCategory: document.getElementById("adminVideoCategory"),
+    adminVideoCode: document.getElementById("adminVideoCode"),
+    adminVideoTitle: document.getElementById("adminVideoTitle"),
+    adminVideoDescription: document.getElementById("adminVideoDescription"),
+    adminVideoFilePath: document.getElementById("adminVideoFilePath"),
+    adminVideoOrder: document.getElementById("adminVideoOrder"),
+    adminVideoActive: document.getElementById("adminVideoActive"),
+    cancelVideoEditBtn: document.getElementById("cancelVideoEditBtn"),
+    adminVideoList: document.getElementById("adminVideoList"),
+    adminVideoEmpty: document.getElementById("adminVideoEmpty")
+  });
+}
+
+function bindEvents() {
+  on(dom.employeeForm, "submit", saveEmployee);
+  on(dom.changeUserBtn, "click", changeUser);
+  on(dom.reloadBtn, "click", refreshAll);
+  on(dom.continueNextBtn, "click", openNextVideo);
+  on(dom.backToLibraryBtn, "click", closeVideoViewer);
+  on(dom.trainingPlayer, "loadedmetadata", restoreCurrentVideoPosition);
+  on(dom.trainingPlayer, "play", () => startVideo(state.currentVideo?.id));
+  on(dom.trainingPlayer, "timeupdate", handleCurrentVideoProgress);
+  on(dom.trainingPlayer, "pause", syncCurrentVideoProgress);
+  on(dom.trainingPlayer, "ended", () => handleCurrentVideoProgress(true));
+  on(dom.trainingPlayer, "error", () => {
+    if (!state.currentVideo) return;
+    showAlert(`El video ${getVideoCode(state.currentVideo)} no se pudo reproducir. Use "Abrir video en pestana nueva" o revise la ruta exacta en GitHub/Supabase.`);
+  });
+  on(dom.completeVideoBtn, "click", completeCurrentVideo);
+  on(dom.adminOpenBtn, "click", openAdmin);
+  on(dom.adminCloseBtn, "click", closeAdmin);
+  on(dom.adminModal, "click", (event) => {
+    if (event.target === dom.adminModal) closeAdmin();
+  });
+  on(dom.adminPinForm, "submit", unlockAdmin);
+  on(dom.adminRecordsTab, "click", () => setAdminTab("records"));
+  on(dom.adminVideosTab, "click", () => setAdminTab("videos"));
+  [dom.filterPerson, dom.filterProject, dom.filterVideo].forEach((control) => {
+    on(control, "input", renderAdminRows);
+    on(control, "change", renderAdminRows);
+  });
+  on(dom.exportCsvBtn, "click", exportExcel);
+  on(dom.newVideoBtn, "click", startNewVideoForm);
+  on(dom.cancelVideoEditBtn, "click", resetVideoForm);
+  on(dom.videoAdminForm, "submit", saveAdminVideo);
+}
+
+async function boot() {
+  initSupabase();
+  restoreEmployee();
+  await refreshAll();
+}
+
+function initSupabase() {
+  if (!window.supabase || !window.supabase.createClient) {
+    showAlert("No se pudo cargar Supabase JS. Revise la conexion a internet o el CDN configurado.");
+    return;
   }
-  const colors = {
-    ok: "background:#0d3b34;color:#5eead4;border:1px solid #14b8a6",
-    saving: "background:#3b340d;color:#fde68a;border:1px solid #d4a514",
-    error: "background:#3b0d0d;color:#fca5a5;border:1px solid #ef4444"
+  state.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+function restoreEmployee() {
+  const saved = safeJsonParse(localStorage.getItem(STORAGE_EMPLOYEE_KEY), null);
+  if (!saved || !saved.id) return;
+  state.employee = saved;
+  dom.fullName.value = saved.full_name || "";
+  dom.cedula.value = saved.cedula || "";
+  dom.projectSite.value = saved.project_site || "";
+  loadLocalProgress();
+  updateSession();
+}
+
+async function refreshAll() {
+  clearAlert();
+  await Promise.all([loadCategories(), loadVideos()]);
+  if (state.employee) await loadViews();
+  renderLearnerExperience();
+}
+
+async function saveEmployee(event) {
+  event.preventDefault();
+  if (!requireSupabase()) return;
+
+  const payload = {
+    full_name: dom.fullName.value.trim(),
+    cedula: dom.cedula.value.trim(),
+    project_site: dom.projectSite.value.trim(),
+    updated_at: new Date().toISOString()
   };
-  el.style.cssText += colors[kind] || colors.ok;
-  el.textContent = text;
-  el.style.opacity = "1";
-  if (kind === "ok") setTimeout(() => { el.style.opacity = "0"; }, 2000);
-}
 
-const TECH_OPTIONS = [
-  "GitHub",
-  "Supabase",
-  "OpenAI",
-  "Make",
-  "Twilio",
-  "Apps Script",
-  "Replit",
-  "Google Drive",
-  "OneDrive",
-  "Canva",
-  "Firebase",
-  "HTML/CSS/JS"
-];
-
-const DEPENDENCY_OPTIONS = [
-  "OpenAI API",
-  "GitHub",
-  "GitHub Pages",
-  "Replit",
-  "Supabase",
-  "Apps Script",
-  "Google Drive",
-  "OneDrive",
-  "Canva",
-  "Make",
-  "Twilio",
-  "Firebase",
-  "Google Sheets"
-];
-
-const USE_OPTIONS = [
-  "Uso interno",
-  "Cliente especifico",
-  "Demo publica",
-  "Demo privada",
-  "Comercializable",
-  "Producto propio"
-];
-
-const URL_FIELDS = [
-  ["publicUrl", "URL publica"],
-  ["demoUrl", "URL demo"],
-  ["privateUrl", "URL privada"],
-  ["githubRepoUrl", "GitHub Repository"],
-  ["githubPagesUrl", "GitHub Pages"],
-  ["replitUrl", "Replit"],
-  ["supabaseUrl", "Supabase"],
-  ["appsScriptUrl", "Apps Script"],
-  ["googleDriveUrl", "Google Drive"],
-  ["oneDriveUrl", "OneDrive"],
-  ["canvaUrl", "Canva"],
-  ["makeUrl", "Make"],
-  ["twilioUrl", "Twilio"],
-  ["openAiUrl", "OpenAI"],
-  ["sheetsUrl", "Google Sheets"]
-];
-
-const STATUS_ALIASES = {
-  Activa: "Produccion",
-  Produccion: "Produccion",
-  "Producción": "Produccion",
-  Desarrollo: "Pruebas",
-  Archivada: "Descontinuado"
-};
-
-const DataStore = {
-  // Trae todas las apps del usuario desde Supabase
-  async load() {
-    if (!currentUser) return [];
-    const { data, error } = await sb
-      .from(SUPABASE_TABLE)
-      .select("data")
-      .order("updated_at", { ascending: false });
-    if (error) {
-      console.error("Supabase load:", error);
-      syncStatus("Error al cargar", "error");
-      return [];
-    }
-    return (data || []).map((row) => normalizeAsset(row.data));
-  },
-  // Sincroniza TODO el inventario: sube los actuales y borra los que ya no existen
-  async save(nextAssets) {
-    if (!currentUser) return;
-    syncStatus("Guardando...", "saving");
-    try {
-      const rows = nextAssets.map((a) => ({
-        id: a.id,
-        user_id: currentUser.id,
-        data: a,
-        updated_at: a.updatedAt || new Date().toISOString()
-      }));
-
-      if (rows.length) {
-        const { error } = await sb.from(SUPABASE_TABLE).upsert(rows, { onConflict: "id" });
-        if (error) throw error;
-      }
-
-      // Borrar de la nube lo que ya no esta en memoria (deletes / imports)
-      const { data: existing, error: selErr } = await sb.from(SUPABASE_TABLE).select("id");
-      if (selErr) throw selErr;
-      const keep = new Set(nextAssets.map((a) => a.id));
-      const toDelete = (existing || []).map((r) => r.id).filter((id) => !keep.has(id));
-      if (toDelete.length) {
-        const { error: delErr } = await sb.from(SUPABASE_TABLE).delete().in("id", toDelete);
-        if (delErr) throw delErr;
-      }
-
-      syncStatus("Guardado en la nube", "ok");
-    } catch (err) {
-      console.error("Supabase save:", err);
-      syncStatus("Error al guardar", "error");
-      alert("No se pudo guardar en la nube. Revisa tu conexion. Tus cambios siguen en pantalla; vuelve a intentar.");
-    }
+  if (!payload.full_name || !payload.cedula || !payload.project_site) {
+    showAlert("Complete nombre, cedula y proyecto/site para continuar.");
+    return;
   }
-};
 
-let assets = [];
-let currentTasks = [];
-let visibleSecrets = new Set();
+  setFormBusy(true);
+  const { data, error } = await state.supabase
+    .from("ehs_employees")
+    .upsert(payload, { onConflict: "cedula" })
+    .select()
+    .single();
+  setFormBusy(false);
 
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => [...document.querySelectorAll(selector)];
+  if (error) {
+    showAlert(`No se pudo guardar el colaborador: ${error.message}`);
+    return;
+  }
 
-const elements = {
-  dialog: $("#assetDialog"),
-  form: $("#assetForm"),
-  assetList: $("#assetList"),
-  locationsList: $("#locationsList"),
-  accessList: $("#accessList"),
-  technicalList: $("#technicalList"),
-  dependenciesList: $("#dependenciesList"),
-  costsList: $("#costsList"),
-  clientsList: $("#clientsList"),
-  tasksList: $("#tasksList"),
-  docsList: $("#docsList"),
-  techStats: $("#techStats"),
-  costStats: $("#costStats"),
-  staleApps: $("#staleApps"),
-  recentUpdates: $("#recentUpdates"),
-  search: $("#globalSearch"),
-  statusFilter: $("#statusFilter")
-};
-
-function uid() {
-  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+  state.employee = data;
+  localStorage.setItem(STORAGE_EMPLOYEE_KEY, JSON.stringify(data));
+  loadLocalProgress();
+  updateSession();
+  await loadViews();
+  renderLearnerExperience();
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
+function changeUser() {
+  localStorage.removeItem(STORAGE_EMPLOYEE_KEY);
+  state.employee = null;
+  state.views = new Map();
+  state.localProgress = {};
+  state.currentVideo = null;
+  if (dom.trainingPlayer) {
+    dom.trainingPlayer.pause();
+    dom.trainingPlayer.removeAttribute("src");
+    dom.trainingPlayer.load();
+  }
+  if (dom.employeeForm) dom.employeeForm.reset();
+  renderLearnerExperience();
 }
 
-function normalize(text) {
-  return String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+async function loadCategories() {
+  state.categories = [];
+  if (!requireSupabase(false)) return;
+  const { data, error } = await state.supabase
+    .from("ehs_training_categories")
+    .select("id, name, description, sort_order, active")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) {
+    showAlert(`No se pudieron cargar las categorias: ${error.message}`);
+    return;
+  }
+  state.categories = data || [];
 }
 
-function normalizeStatus(status) {
-  return STATUS_ALIASES[status] || status || "Idea";
+async function loadVideos() {
+  state.videos = [];
+  if (!requireSupabase(false)) return;
+  const { data, error } = await state.supabase
+    .from("ehs_training_videos")
+    .select("id, category_id, video_code, title, description, file_path, active, sort_order, ehs_training_categories(name)")
+    .eq("active", true)
+    .order("sort_order", { ascending: true })
+    .order("video_code", { ascending: true });
+  if (error) {
+    showAlert(`No se pudieron cargar los videos: ${error.message}`);
+    return;
+  }
+  state.videos = data || [];
 }
 
-function statusClass(status) {
-  return `status-${normalize(normalizeStatus(status)).replace(/\s+/g, "-")}`;
+async function loadViews() {
+  state.views = new Map();
+  if (!state.employee || !requireSupabase(false)) return;
+  const { data, error } = await state.supabase
+    .from("ehs_video_views")
+    .select("*")
+    .eq("employee_id", state.employee.id);
+  if (error) {
+    showAlert(`No se pudo cargar el progreso personal: ${error.message}`);
+    return;
+  }
+  (data || []).forEach((view) => state.views.set(view.video_id, view));
 }
 
-function money(value) {
-  return `$${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+function renderLearnerExperience() {
+  updateSession();
+  renderProgress();
+  renderNextTraining();
+  renderVideoLibrary();
+  updateCurrentViewer();
+}
+
+function updateSession() {
+  const hasEmployee = Boolean(state.employee);
+  toggleHidden(dom.registerPanel, hasEmployee);
+  toggleHidden(dom.learnerArea, !hasEmployee);
+
+  if (!hasEmployee) {
+    setText(dom.sessionBadge, "Sin registro");
+    setClassName(dom.sessionBadge, "status-pill pending");
+    return;
+  }
+
+  setText(dom.sessionBadge, `Registrado: ${state.employee.full_name}`);
+  setClassName(dom.sessionBadge, "status-pill completed");
+  setText(dom.learnerName, state.employee.full_name || "colaborador");
+  setText(dom.learnerProject, `Proyecto: ${state.employee.project_site || "--"}`);
+}
+
+function renderProgress() {
+  const total = state.videos.length;
+  const completed = state.videos.filter((video) => state.views.get(video.id)?.completed).length;
+  const pending = Math.max(0, total - completed);
+  const percent = total ? Math.round((completed / total) * 100) : 0;
+
+  setText(dom.metricPercent, `${percent}%`);
+  setText(dom.metricCompleted, `${completed} de ${total}`);
+  setText(dom.metricPending, `${pending}`);
+  setText(dom.progressSummary, `${completed} de ${total} completados`);
+  setWidth(dom.progressBar, `${percent}%`);
+  toggleHidden(dom.completionPanel, !(total > 0 && completed === total));
+}
+
+function renderNextTraining() {
+  const next = getNextPendingVideo();
+  toggleHidden(dom.nextTrainingPanel, !next);
+  if (!next) return;
+  setText(dom.nextTitle, `${getVideoCode(next)} - ${next.title || "Capacitacion"}`);
+  setText(dom.nextDescription, next.description || "Continua con la siguiente capacitacion pendiente de tu ruta.");
+  if (dom.continueNextBtn) dom.continueNextBtn.disabled = false;
+}
+
+function getNextPendingVideo() {
+  return state.videos.find((video) => !state.views.get(video.id)?.completed) || null;
+}
+
+function openNextVideo() {
+  const next = getNextPendingVideo();
+  if (next) openVideo(next.id);
+}
+
+function renderVideoLibrary() {
+  if (!dom.videoList) return;
+  dom.videoList.innerHTML = "";
+  toggleHidden(dom.emptyState, state.videos.length > 0);
+
+  state.videos.forEach((video) => {
+    const view = state.views.get(video.id);
+    const progress = getVideoProgress(video.id, view);
+    const status = getStatus(progress, view);
+    const card = document.createElement("article");
+    card.className = "video-card";
+    card.innerHTML = `
+      <div class="video-body">
+        <div class="video-meta">
+          <span class="category-chip">${escapeHtml(getCategoryName(video))}</span>
+          <span class="code-chip">${escapeHtml(getVideoCode(video))}</span>
+          <span class="status-pill ${status.className}">${status.label}</span>
+        </div>
+        <div>
+          <h3>${escapeHtml(video.title || "Capacitacion sin titulo")}</h3>
+          <p class="muted">${escapeHtml(video.description || "Sin descripcion.")}</p>
+        </div>
+        <p class="muted">Avance del video: <strong>${Math.round(progress)}%</strong></p>
+        <div class="video-actions">
+          <button class="primary-btn" type="button" data-open-video="${escapeAttribute(video.id)}">Ver video</button>
+          <a class="secondary-btn" href="${escapeAttribute(video.file_path || "#")}" target="_blank" rel="noopener">Abrir video en pestana nueva</a>
+        </div>
+        <p class="muted">Debe firmar RH-F-05 al completar esta capacitacion.</p>
+      </div>
+    `;
+    card.querySelector("[data-open-video]").addEventListener("click", () => openVideo(video.id));
+    dom.videoList.appendChild(card);
+  });
+}
+
+function openVideo(videoId) {
+  const video = state.videos.find((item) => item.id === videoId);
+  if (!video) {
+    showAlert("No se encontro la capacitacion seleccionada.");
+    return;
+  }
+  state.currentVideo = video;
+  toggleHidden(dom.videoViewer, false);
+  resetExternalPlayer();
+  if (isExternalVideo(video.file_path)) {
+    toggleHidden(dom.trainingPlayer, true);
+    toggleHidden(dom.externalPlayerWrap, false);
+    if (dom.externalOpenLink) dom.externalOpenLink.href = video.file_path || "#";
+    startVideo(video.id);
+    window.open(video.file_path, "_blank", "noopener");
+  } else if (dom.trainingPlayer) {
+    toggleHidden(dom.trainingPlayer, false);
+    toggleHidden(dom.externalPlayerWrap, true);
+    dom.trainingPlayer.src = video.file_path || "";
+    dom.trainingPlayer.load();
+  }
+  updateCurrentViewer();
+  if (dom.videoViewer) dom.videoViewer.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function closeVideoViewer() {
+  syncCurrentVideoProgress();
+  if (dom.trainingPlayer) dom.trainingPlayer.pause();
+  resetExternalPlayer();
+  toggleHidden(dom.videoViewer, true);
+}
+
+function updateCurrentViewer() {
+  const video = state.currentVideo;
+  if (!video) return;
+
+  const view = state.views.get(video.id);
+  const progress = getVideoProgress(video.id, view);
+  const status = getStatus(progress, view);
+
+  setClassName(dom.viewerStatus, `status-pill ${status.className}`);
+  setText(dom.viewerStatus, status.label);
+  setText(dom.viewerCategory, getCategoryName(video));
+  setText(dom.viewerTitle, `${getVideoCode(video)} - ${video.title || "Capacitacion"}`);
+  setText(dom.viewerDescription, video.description || "Sin descripcion.");
+  if (dom.openVideoLink) dom.openVideoLink.href = video.file_path || "#";
+  setWidth(dom.viewerProgressBar, `${Math.min(100, Math.round(progress))}%`);
+  if (isExternalVideo(video.file_path) && !view?.completed) {
+    setText(dom.viewerProgressText, "Video externo: se abre en una pestana nueva. Al terminar de verlo, regrese y marque como completado.");
+  } else {
+    setText(dom.viewerProgressText, `Avance visto: ${Math.round(progress)}%. Debe llegar al 95% para completar.`);
+  }
+  setText(
+    dom.viewerSignatureNote,
+    isExternalVideo(video.file_path)
+      ? "El registro digital no sustituye la firma fisica. Estos videos Vimeo pueden firmarse juntos en una hoja regular de capacitacion."
+      : "El registro digital no sustituye la firma fisica. Debe firmar RH-F-05."
+  );
+  if (dom.completeVideoBtn) {
+    dom.completeVideoBtn.disabled = isExternalVideo(video.file_path) ? Boolean(view?.completed) : !isCompleteButtonEnabled(progress, view);
+    dom.completeVideoBtn.textContent = view?.completed ? "Completado" : "Marcar como completado";
+  }
+}
+
+async function startVideo(videoId) {
+  if (!videoId || !state.employee || !requireSupabase(false)) return;
+  if (state.views.has(videoId)) return;
+
+  const payload = {
+    employee_id: state.employee.id,
+    video_id: videoId,
+    started_at: new Date().toISOString(),
+    progress_percent: getVideoProgress(videoId),
+    completed: false,
+    signature_required: true,
+    signature_reminder_ack: false
+  };
+
+  const { data, error } = await state.supabase
+    .from("ehs_video_views")
+    .upsert(payload, { onConflict: "employee_id,video_id" })
+    .select()
+    .single();
+  if (!error && data) state.views.set(videoId, data);
+}
+
+function handleCurrentVideoProgress(forceComplete = false) {
+  const video = state.currentVideo;
+  const player = dom.trainingPlayer;
+  if (!video || !player.duration || Number.isNaN(player.duration)) return;
+
+  const percent = Math.min(100, (player.currentTime / player.duration) * 100);
+  const nextProgress = forceComplete === true ? 100 : percent;
+  if (!state.localProgress[video.id] || nextProgress > state.localProgress[video.id]) {
+    state.localProgress[video.id] = nextProgress;
+    saveLocalProgress();
+  }
+  updateCurrentViewer();
+  renderVideoLibrary();
+  syncPartialProgress(video.id, nextProgress, forceComplete === true);
+}
+
+function syncCurrentVideoProgress() {
+  const video = state.currentVideo;
+  if (video && isExternalVideo(video.file_path)) {
+    syncPartialProgress(video.id, getVideoProgress(video.id), true);
+    return;
+  }
+  const player = dom.trainingPlayer;
+  if (!video || !player.duration || Number.isNaN(player.duration)) return;
+  const percent = Math.min(100, (player.currentTime / player.duration) * 100);
+  if (percent > 0) syncPartialProgress(video.id, percent, true);
+}
+
+function restoreCurrentVideoPosition() {
+  const video = state.currentVideo;
+  if (video && isExternalVideo(video.file_path)) return;
+  const player = dom.trainingPlayer;
+  if (!video || !player.duration || Number.isNaN(player.duration)) return;
+
+  const view = state.views.get(video.id);
+  if (view?.completed) return;
+  const progress = getVideoProgress(video.id, view);
+  if (progress < 2 || progress >= 95) return;
+
+  const resumeAt = Math.max(0, ((progress / 100) * player.duration) - 5);
+  if (resumeAt > 0 && resumeAt < player.duration) player.currentTime = resumeAt;
+}
+
+function resetExternalPlayer() {
+  if (dom.externalOpenLink) dom.externalOpenLink.href = "#";
+}
+
+async function syncPartialProgress(videoId, progress, force = false) {
+  if (!state.employee || !requireSupabase(false)) return;
+  const existing = state.views.get(videoId);
+  if (existing?.completed) return;
+
+  const now = Date.now();
+  const last = state.progressSync[videoId] || { at: 0, progress: Number(existing?.progress_percent || 0) };
+  const roundedProgress = Math.min(100, Math.round(progress));
+  const progressedEnough = roundedProgress >= last.progress + 5;
+  const waitedEnough = now - last.at >= 12000;
+
+  if (!force && roundedProgress < 1) return;
+  if (!force && !progressedEnough && !waitedEnough) return;
+
+  const payload = {
+    employee_id: state.employee.id,
+    video_id: videoId,
+    started_at: existing?.started_at || new Date().toISOString(),
+    progress_percent: Math.max(Number(existing?.progress_percent || 0), roundedProgress),
+    completed: false,
+    signature_required: true,
+    signature_reminder_ack: false,
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await state.supabase
+    .from("ehs_video_views")
+    .upsert(payload, { onConflict: "employee_id,video_id" })
+    .select()
+    .single();
+
+  if (!error && data) {
+    state.views.set(videoId, data);
+    state.progressSync[videoId] = { at: now, progress: Number(data.progress_percent || roundedProgress) };
+    renderProgress();
+    renderNextTraining();
+  }
+}
+
+async function completeCurrentVideo() {
+  const video = state.currentVideo;
+  if (!video) return;
+  if (!state.employee) {
+    showAlert("Primero registre el colaborador para guardar el avance personal.");
+    return;
+  }
+  if (!requireSupabase()) return;
+
+  const progress = Math.max(95, getVideoProgress(video.id));
+  const existing = state.views.get(video.id);
+  const payload = {
+    employee_id: state.employee.id,
+    video_id: video.id,
+    started_at: existing?.started_at || new Date().toISOString(),
+    completed_at: new Date().toISOString(),
+    progress_percent: progress,
+    completed: true,
+    signature_required: true,
+    signature_reminder_ack: true,
+    updated_at: new Date().toISOString()
+  };
+
+  const query = existing
+    ? state.supabase.from("ehs_video_views").update(payload).eq("id", existing.id)
+    : state.supabase.from("ehs_video_views").insert(payload);
+
+  const { data, error } = await query.select().single();
+  if (error) {
+    showAlert(`No se pudo guardar la capacitacion completada: ${error.message}`);
+    return;
+  }
+
+  state.views.set(video.id, data);
+  state.progressSync[video.id] = { at: Date.now(), progress: Number(data.progress_percent || progress) };
+  state.localProgress[video.id] = Math.max(state.localProgress[video.id] || 0, progress);
+  saveLocalProgress();
+  renderLearnerExperience();
+}
+
+function getVideoProgress(videoId, view = state.views.get(videoId)) {
+  return Math.max(Number(view?.progress_percent || 0), Number(state.localProgress[videoId] || 0));
+}
+
+function getVideoCode(video) {
+  return video?.video_code || video?.code || "";
+}
+
+function getCategoryName(video) {
+  return video?.ehs_training_categories?.name || state.categories.find((item) => item.id === video?.category_id)?.name || "EHS";
+}
+
+function isExternalVideo(filePath) {
+  return /^https?:\/\//i.test(String(filePath || ""));
+}
+
+function getStatus(progress, view) {
+  if (view?.completed) return { label: "Completado", className: "completed" };
+  if (progress > 0) return { label: "En progreso", className: "in-progress" };
+  return { label: "Pendiente", className: "pending" };
+}
+
+function isCompleteButtonEnabled(progress, view) {
+  return Boolean(state.employee && !view?.completed && progress >= 95);
+}
+
+function loadLocalProgress() {
+  state.localProgress = safeJsonParse(localStorage.getItem(progressStorageKey()), {});
+}
+
+function saveLocalProgress() {
+  if (!state.employee) return;
+  localStorage.setItem(progressStorageKey(), JSON.stringify(state.localProgress));
+}
+
+function progressStorageKey() {
+  return `${STORAGE_PROGRESS_PREFIX}${state.employee?.cedula || "anon"}`;
+}
+
+async function openAdmin() {
+  toggleHidden(dom.adminModal, false);
+  if (dom.adminPin) dom.adminPin.focus();
+  if (state.adminAuthenticated) await loadAdminData();
+}
+
+function closeAdmin() {
+  toggleHidden(dom.adminModal, true);
+}
+
+async function unlockAdmin(event) {
+  event.preventDefault();
+  if (dom.adminPin.value !== ADMIN_PIN) {
+    showAlert("Clave de administrador incorrecta.");
+    return;
+  }
+  state.adminAuthenticated = true;
+  toggleHidden(dom.adminPinForm, true);
+  toggleHidden(dom.adminContent, false);
+  await loadAdminData();
+}
+
+function setAdminTab(tab) {
+  const isRecords = tab === "records";
+  toggleClass(dom.adminRecordsTab, "active", isRecords);
+  toggleClass(dom.adminVideosTab, "active", !isRecords);
+  toggleHidden(dom.adminRecordsPanel, !isRecords);
+  toggleHidden(dom.adminVideosPanel, isRecords);
+}
+
+async function loadAdminData() {
+  await Promise.all([loadAdminRows(), loadAdminVideos()]);
+  populateCategorySelect();
+}
+
+async function loadAdminRows() {
+  if (!requireSupabase()) return;
+  const { data, error } = await state.supabase
+    .from("ehs_video_views")
+    .select("completed_at, progress_percent, completed, ehs_employees(full_name, cedula, project_site), ehs_training_videos(id, video_code, title)")
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    showAlert(`No se pudieron cargar los registros del administrador: ${error.message}`);
+    return;
+  }
+
+  state.adminRows = data || [];
+  populateVideoFilter();
+  renderAdminSummary();
+  renderAdminRows();
+}
+
+async function loadAdminVideos() {
+  if (!requireSupabase()) return;
+  const { data, error } = await state.supabase
+    .from("ehs_training_videos")
+    .select("id, category_id, video_code, title, description, file_path, active, sort_order, ehs_training_categories(name)")
+    .order("sort_order", { ascending: true })
+    .order("video_code", { ascending: true });
+
+  if (error) {
+    showAlert(`No se pudieron cargar las capacitaciones del administrador: ${error.message}`);
+    return;
+  }
+
+  state.adminVideos = data || [];
+  renderAdminVideos();
+}
+
+function renderAdminSummary() {
+  const total = state.adminRows.length;
+  const completed = state.adminRows.filter((row) => row.completed).length;
+  setText(dom.adminTotalViews, total);
+  setText(dom.adminCompletedViews, completed);
+  setText(dom.adminPendingViews, Math.max(0, total - completed));
+}
+
+function populateVideoFilter() {
+  if (!dom.filterVideo) return;
+  const current = dom.filterVideo.value;
+  const options = new Map();
+  [...state.videos, ...state.adminVideos].forEach((video) => {
+    if (video?.id) options.set(video.id, `${getVideoCode(video)} - ${video.title}`);
+  });
+
+  dom.filterVideo.innerHTML = '<option value="">Todos los videos</option>';
+  [...options.entries()].sort((a, b) => a[1].localeCompare(b[1])).forEach(([id, label]) => {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = label;
+    dom.filterVideo.appendChild(option);
+  });
+  dom.filterVideo.value = current;
+}
+
+function getFilteredAdminRows() {
+  const person = normalize(dom.filterPerson.value);
+  const project = normalize(dom.filterProject.value);
+  const videoId = dom.filterVideo.value;
+
+  return state.adminRows.filter((row) => {
+    const employee = row.ehs_employees || {};
+    const video = row.ehs_training_videos || {};
+    const personText = normalize(`${employee.full_name || ""} ${employee.cedula || ""}`);
+    const projectText = normalize(employee.project_site || "");
+    return (!person || personText.includes(person))
+      && (!project || projectText.includes(project))
+      && (!videoId || video.id === videoId);
+  });
+}
+
+function renderAdminRows() {
+  const rows = getFilteredAdminRows();
+  if (!dom.adminRows) return;
+  dom.adminRows.innerHTML = "";
+  rows.forEach((row) => {
+    const employee = row.ehs_employees || {};
+    const video = row.ehs_training_videos || {};
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(employee.full_name || "")}</td>
+      <td>${escapeHtml(employee.cedula || "")}</td>
+      <td>${escapeHtml(employee.project_site || "")}</td>
+      <td>${escapeHtml(`${getVideoCode(video)} - ${video.title || ""}`)}</td>
+      <td>${escapeHtml(formatDate(row.completed_at))}</td>
+      <td>${Math.round(Number(row.progress_percent || 0))}%</td>
+    `;
+    dom.adminRows.appendChild(tr);
+  });
+  toggleHidden(dom.adminEmpty, rows.length > 0);
+}
+
+async function exportExcel() {
+  const rows = getFilteredAdminRows();
+  const headers = ["Colaborador", "Cedula", "Proyecto", "Video", "Fecha", "Porcentaje", "Completado"];
+  const body = rows.map((row) => {
+    const employee = row.ehs_employees || {};
+    const video = row.ehs_training_videos || {};
+    return [
+      employee.full_name || "",
+      employee.cedula || "",
+      employee.project_site || "",
+      `${getVideoCode(video)} - ${video.title || ""}`,
+      formatDate(row.completed_at || row.updated_at),
+      Math.round(Number(row.progress_percent || 0)),
+      row.completed ? "si" : "no"
+    ];
+  });
+
+  if (!window.ExcelJS) {
+    const csv = [headers, ...body].map((line) => line.map(csvCell).join(",")).join("\n");
+    downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `sbm-safety-academy-registros-${new Date().toISOString().slice(0, 10)}.csv`);
+    return;
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "SBM Safety Academy";
+  workbook.created = new Date();
+  const summary = workbook.addWorksheet("Resumen");
+  const records = workbook.addWorksheet("Registros", { views: [{ state: "frozen", ySplit: 1 }] });
+  const completed = body.filter((row) => row[6] === "si").length;
+
+  summary.mergeCells("A1:D1");
+  summary.getCell("A1").value = "SBM Safety Academy - Registros";
+  summary.getCell("A1").font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+  summary.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
+  summary.addRow([]);
+  summary.addRow(["Fecha de exportacion", new Date(), "Total registros", body.length]);
+  summary.addRow(["Completados", completed, "Pendientes", body.length - completed]);
+  summary.getColumn(1).width = 24;
+  summary.getColumn(2).width = 22;
+  summary.getColumn(3).width = 18;
+  summary.getColumn(4).width = 16;
+  summary.getCell("B3").numFmt = "yyyy-mm-dd hh:mm";
+
+  records.addRow(headers);
+  body.forEach((row) => records.addRow(row));
+  records.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
+  records.getRow(1).eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  });
+  records.columns = headers.map((header, index) => {
+    const longest = Math.max(header.length, ...body.map((row) => String(row[index] || "").length));
+    return { width: Math.min(Math.max(longest + 3, 14), 44) };
+  });
+  records.eachRow((row, rowNumber) => {
+    row.eachCell((cell) => {
+      cell.alignment = { vertical: "top", wrapText: true };
+      cell.border = { bottom: { style: "hair", color: { argb: "FFE5E7EB" } } };
+      if (rowNumber > 1 && rowNumber % 2 === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  downloadBlob(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `sbm-safety-academy-registros-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function populateCategorySelect() {
+  if (!dom.adminVideoCategory) return;
+  dom.adminVideoCategory.innerHTML = "";
+  state.categories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category.id;
+    option.textContent = category.name;
+    dom.adminVideoCategory.appendChild(option);
+  });
+  if (!state.categories.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Sin categorias disponibles";
+    dom.adminVideoCategory.appendChild(option);
+  }
+}
+
+function renderAdminVideos() {
+  if (!dom.adminVideoList) return;
+  dom.adminVideoList.innerHTML = "";
+  toggleHidden(dom.adminVideoEmpty, state.adminVideos.length > 0);
+
+  state.adminVideos.forEach((video) => {
+    const card = document.createElement("article");
+    card.className = "admin-video-card";
+    card.innerHTML = `
+      <div>
+        <div class="video-meta">
+          <span class="category-chip">${escapeHtml(getCategoryName(video))}</span>
+          <span class="code-chip">${escapeHtml(getVideoCode(video))}</span>
+          <span class="status-pill ${video.active ? "completed" : "pending"}">${video.active ? "Activo" : "Inactivo"}</span>
+        </div>
+        <h3>${escapeHtml(video.title || "Capacitacion")}</h3>
+        <p class="muted">${escapeHtml(video.file_path || "")}</p>
+      </div>
+      <div class="admin-video-actions">
+        <button class="secondary-btn" type="button" data-edit-video="${escapeAttribute(video.id)}">Editar datos</button>
+        <button class="secondary-btn" type="button" data-toggle-video="${escapeAttribute(video.id)}">${video.active ? "Desactivar" : "Activar"}</button>
+      </div>
+    `;
+    card.querySelector("[data-edit-video]").addEventListener("click", () => editAdminVideo(video.id));
+    card.querySelector("[data-toggle-video]").addEventListener("click", () => toggleAdminVideo(video.id));
+    dom.adminVideoList.appendChild(card);
+  });
+}
+
+function startNewVideoForm() {
+  resetVideoForm();
+  toggleHidden(dom.videoAdminForm, false);
+  if (dom.adminVideoCode) dom.adminVideoCode.focus();
+}
+
+function editAdminVideo(videoId) {
+  const video = state.adminVideos.find((item) => item.id === videoId);
+  if (!video) return;
+  dom.adminVideoId.value = video.id;
+  dom.adminVideoCategory.value = video.category_id || "";
+  dom.adminVideoCode.value = getVideoCode(video);
+  dom.adminVideoTitle.value = video.title || "";
+  dom.adminVideoDescription.value = video.description || "";
+  dom.adminVideoFilePath.value = video.file_path || "";
+  dom.adminVideoOrder.value = Number(video.sort_order || 0);
+  dom.adminVideoActive.checked = Boolean(video.active);
+  toggleHidden(dom.videoAdminForm, false);
+  if (dom.videoAdminForm) dom.videoAdminForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function resetVideoForm() {
+  if (dom.videoAdminForm) dom.videoAdminForm.reset();
+  if (dom.adminVideoId) dom.adminVideoId.value = "";
+  if (dom.adminVideoOrder) dom.adminVideoOrder.value = 0;
+  if (dom.adminVideoActive) dom.adminVideoActive.checked = true;
+  if (state.categories[0] && dom.adminVideoCategory) dom.adminVideoCategory.value = state.categories[0].id;
+  toggleHidden(dom.videoAdminForm, true);
+}
+
+async function saveAdminVideo(event) {
+  event.preventDefault();
+  if (!requireSupabase()) return;
+  if (!dom.adminVideoCategory.value) {
+    showAlert("Debe existir al menos una categoria para guardar una capacitacion.");
+    return;
+  }
+
+  const id = dom.adminVideoId.value;
+  const payload = {
+    category_id: dom.adminVideoCategory.value,
+    video_code: dom.adminVideoCode.value.trim(),
+    title: dom.adminVideoTitle.value.trim(),
+    description: dom.adminVideoDescription.value.trim(),
+    file_path: dom.adminVideoFilePath.value.trim(),
+    sort_order: Number(dom.adminVideoOrder.value || 0),
+    active: dom.adminVideoActive.checked,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!payload.video_code || !payload.title || !payload.file_path) {
+    showAlert("Complete codigo, titulo y file_path para guardar la capacitacion.");
+    return;
+  }
+
+  const request = id
+    ? state.supabase.from("ehs_training_videos").update(payload).eq("id", id)
+    : state.supabase.from("ehs_training_videos").insert(payload);
+
+  const { error } = await request;
+  if (error) {
+    showAlert(`No se pudo guardar la capacitacion. Revise permisos RLS para insert/update en ehs_training_videos. Detalle: ${error.message}`);
+    return;
+  }
+
+  resetVideoForm();
+  await Promise.all([loadVideos(), loadAdminVideos()]);
+  populateVideoFilter();
+  renderLearnerExperience();
+}
+
+async function toggleAdminVideo(videoId) {
+  if (!requireSupabase()) return;
+  const video = state.adminVideos.find((item) => item.id === videoId);
+  if (!video) return;
+
+  const { error } = await state.supabase
+    .from("ehs_training_videos")
+    .update({ active: !video.active, updated_at: new Date().toISOString() })
+    .eq("id", videoId);
+
+  if (error) {
+    showAlert(`No se pudo cambiar el estado del video. Revise permisos RLS para update en ehs_training_videos. Detalle: ${error.message}`);
+    return;
+  }
+
+  await Promise.all([loadVideos(), loadAdminVideos()]);
+  renderLearnerExperience();
+}
+
+function setFormBusy(isBusy) {
+  if (!dom.employeeForm) return;
+  dom.employeeForm.querySelectorAll("input, button").forEach((el) => {
+    el.disabled = isBusy;
+  });
+}
+
+function requireSupabase(show = true) {
+  const ready = Boolean(state.supabase);
+  if (!ready && show) showAlert("Supabase no esta disponible. Revise la conexion de red y la anon key configurada.");
+  return ready;
+}
+
+function showAlert(message) {
+  if (!dom.appAlert) {
+    console.error(message);
+    return;
+  }
+  dom.appAlert.textContent = message;
+  dom.appAlert.classList.remove("hidden");
+  dom.appAlert.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function clearAlert() {
+  setText(dom.appAlert, "");
+  toggleHidden(dom.appAlert, true);
+}
+
+function on(element, eventName, handler) {
+  if (element) element.addEventListener(eventName, handler);
+}
+
+function setText(element, value) {
+  if (element) element.textContent = value;
+}
+
+function setClassName(element, value) {
+  if (element) element.className = value;
+}
+
+function setWidth(element, value) {
+  if (element) element.style.width = value;
+}
+
+function toggleHidden(element, shouldHide) {
+  toggleClass(element, "hidden", shouldHide);
+}
+
+function toggleClass(element, className, force) {
+  if (element) element.classList.toggle(className, force);
+}
+
+function safeJsonParse(value, fallback) {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalize(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("es-GT", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
+function csvCell(value) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
 function escapeHtml(value) {
-  return String(value || "")
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -214,875 +1040,6 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function normalizeAsset(asset) {
-  const technologies = (asset.technologies || []).map((tech) => tech === "HTML" || tech === "JavaScript" ? "HTML/CSS/JS" : tech);
-  return {
-    id: asset.id || uid(),
-    name: asset.name || "",
-    category: asset.category || "",
-    description: asset.description || asset.docs?.functionalDescription || "",
-    createdAt: asset.createdAt || today(),
-    status: normalizeStatus(asset.status),
-    urls: { ...(asset.urls || {}) },
-    access: { ...(asset.access || {}) },
-    technologies: [...new Set(technologies)],
-    dependencies: asset.dependencies || asset.docs?.dependencies?.split("\n").filter(Boolean) || [],
-    dependencyNotes: asset.dependencyNotes || "",
-    costs: {
-      monthly: Number(asset.costs?.monthly || 0),
-      annual: Number(asset.costs?.annual || 0),
-      paymentStatus: asset.costs?.paymentStatus || "Gratis",
-      notes: asset.costs?.notes || ""
-    },
-    uses: asset.uses || [],
-    clientName: asset.clientName || "",
-    owner: asset.owner || "",
-    relatedProject: asset.relatedProject || "",
-    tasks: asset.tasks || [],
-    docs: { ...(asset.docs || {}) },
-    createdRecordAt: asset.createdRecordAt || new Date().toISOString(),
-    updatedAt: asset.updatedAt || new Date().toISOString()
-  };
+function escapeAttribute(value) {
+  return escapeHtml(value);
 }
-
-function filteredAssets() {
-  const query = normalize(elements.search.value);
-  const status = elements.statusFilter.value;
-  return assets.filter((asset) => {
-    const statusMatches = !status || normalizeStatus(asset.status) === status;
-    if (!statusMatches) return false;
-    if (!query) return true;
-
-    const haystack = [
-      asset.name,
-      asset.category,
-      asset.description,
-      asset.clientName,
-      asset.owner,
-      asset.relatedProject,
-      asset.status,
-      asset.dependencyNotes,
-      asset.costs?.notes,
-      ...Object.values(asset.urls || {}),
-      ...(asset.technologies || []),
-      ...(asset.dependencies || []),
-      ...(asset.uses || []),
-      ...Object.values(asset.docs || {})
-    ].join(" ");
-    return normalize(haystack).includes(query);
-  });
-}
-
-function emptyState() {
-  return $("#emptyTemplate").content.firstElementChild.cloneNode(true);
-}
-
-function render() {
-  const list = filteredAssets();
-  renderMetrics(list);
-  renderDashboard(list);
-  renderInventory(list);
-  renderLocations(list);
-  renderAccess(list);
-  renderTechnical(list);
-  renderDependencies(list);
-  renderCosts(list);
-  renderClients(list);
-  renderTasks(list);
-  renderDocs(list);
-  renderBackupStatus();
-}
-
-function renderMetrics(list) {
-  $("#totalApps").textContent = list.length;
-  $("#productionApps").textContent = list.filter((asset) => asset.status === "Produccion").length;
-  $("#testingApps").textContent = list.filter((asset) => asset.status === "Pruebas").length;
-  $("#ideaApps").textContent = list.filter((asset) => asset.status === "Idea").length;
-  $("#discontinuedApps").textContent = list.filter((asset) => asset.status === "Descontinuado").length;
-  $("#activeClients").textContent = new Set(list.map((asset) => asset.clientName || asset.owner).filter(Boolean)).size;
-  $("#monthlyCost").textContent = money(list.reduce((sum, asset) => sum + Number(asset.costs?.monthly || 0), 0));
-  $("#annualCost").textContent = money(list.reduce((sum, asset) => sum + Number(asset.costs?.annual || 0), 0));
-}
-
-function renderDashboard(list) {
-  const counts = TECH_OPTIONS.map((tech) => ({
-    tech,
-    count: list.filter((asset) => (asset.technologies || []).includes(tech)).length
-  })).filter((item) => item.count > 0).sort((a, b) => b.count - a.count);
-
-  elements.techStats.innerHTML = "";
-  if (!counts.length) elements.techStats.append(emptyState());
-  counts.slice(0, 8).forEach((item) => {
-    elements.techStats.insertAdjacentHTML("beforeend", `<div class="stat-row"><strong>${escapeHtml(item.tech)}</strong><span>${item.count}</span></div>`);
-  });
-
-  elements.recentUpdates.innerHTML = "";
-  const recent = [...list].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)).slice(0, 7);
-  if (!recent.length) elements.recentUpdates.append(emptyState());
-  recent.forEach((asset) => {
-    elements.recentUpdates.insertAdjacentHTML("beforeend", `
-      <div class="activity-row">
-        <div><strong>${escapeHtml(asset.name)}</strong><br><span>${escapeHtml(asset.category || "Sin categoria")}</span></div>
-        <span>${escapeHtml((asset.updatedAt || "").slice(0, 10))}</span>
-      </div>
-    `);
-  });
-
-  const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
-  const stale = list.filter((asset) => new Date(asset.updatedAt || asset.createdAt || 0).getTime() < cutoff);
-  elements.staleApps.innerHTML = "";
-  if (!stale.length) elements.staleApps.innerHTML = `<div class="stat-row"><strong>Todo al dia</strong><span>0</span></div>`;
-  stale.slice(0, 8).forEach((asset) => {
-    elements.staleApps.insertAdjacentHTML("beforeend", `
-      <div class="activity-row">
-        <div><strong>${escapeHtml(asset.name)}</strong><br><span>${escapeHtml(asset.clientName || asset.owner || "Sin cliente")}</span></div>
-        <span>${escapeHtml((asset.updatedAt || asset.createdAt || "").slice(0, 10))}</span>
-      </div>
-    `);
-  });
-
-  const free = list.filter((asset) => asset.costs?.paymentStatus === "Gratis" || (!asset.costs?.monthly && !asset.costs?.annual)).length;
-  const paid = list.length - free;
-  elements.costStats.innerHTML = `
-    <div class="stat-row"><strong>Servicios gratuitos</strong><span>${free}</span></div>
-    <div class="stat-row"><strong>Servicios de pago</strong><span>${paid}</span></div>
-    <div class="stat-row"><strong>Total mensual</strong><span>${money(list.reduce((sum, asset) => sum + Number(asset.costs?.monthly || 0), 0))}</span></div>
-    <div class="stat-row"><strong>Total anual</strong><span>${money(list.reduce((sum, asset) => sum + Number(asset.costs?.annual || 0), 0))}</span></div>
-  `;
-}
-
-function renderInventory(list) {
-  elements.assetList.innerHTML = "";
-  if (!list.length) return elements.assetList.append(emptyState());
-
-  list.forEach((asset) => {
-    elements.assetList.insertAdjacentHTML("beforeend", `
-      <article class="asset-card">
-        <div>
-          <div class="card-meta">
-            <span class="status-badge ${statusClass(asset.status)}">${escapeHtml(asset.status)}</span>
-            <span class="chip">${escapeHtml(asset.category || "Sin categoria")}</span>
-            <span class="chip">Creada: ${escapeHtml(asset.createdAt || "Sin fecha")}</span>
-            <span class="chip">Actualizada: ${escapeHtml((asset.updatedAt || "").slice(0, 10) || "Sin fecha")}</span>
-          </div>
-          <h4>${escapeHtml(asset.name)}</h4>
-          <p>${escapeHtml(asset.description || "Sin descripcion registrada.")}</p>
-          <div class="chip-row">${chipList(asset.technologies, "Sin tecnologias marcadas")}</div>
-        </div>
-        <button class="secondary-btn" data-edit="${asset.id}">Editar</button>
-      </article>
-    `);
-  });
-}
-
-function renderLocations(list) {
-  renderDetailList(elements.locationsList, list, (asset) => {
-    const links = URL_FIELDS
-      .filter(([key]) => asset.urls?.[key])
-      .map(([key, label]) => `<a class="link-pill" href="${escapeHtml(asset.urls[key])}" target="_blank" rel="noopener">Abrir ${escapeHtml(label)}</a>`)
-      .join("");
-    return `<div class="link-grid">${links || "<span class='chip'>Sin ubicaciones registradas</span>"}</div>`;
-  });
-}
-
-function renderAccess(list) {
-  renderDetailList(elements.accessList, list, (asset) => {
-    const access = asset.access || {};
-    return `
-      <div class="access-grid">
-        <span class="chip">Usuario: ${escapeHtml(access.username || "Sin usuario")}</span>
-        <span class="chip">Correo: ${escapeHtml(access.email || "Sin correo")}</span>
-        <span class="chip">MFA: ${escapeHtml(access.mfaEnabled || "No registrado")}</span>
-        <span class="chip">Metodo MFA: ${escapeHtml(access.mfaMethod || "Sin metodo")}</span>
-        <span class="chip">Ubicacion MFA: ${escapeHtml(access.mfaLocation || "Sin ubicacion")}</span>
-      </div>
-      ${secretRow(asset.id, "password", "Contrasena", access.password)}
-      ${secretRow(asset.id, "apiKeys", "API Keys", access.apiKeys)}
-      <p>${escapeHtml(access.accessNotes || "Sin notas de acceso.")}</p>
-    `;
-  });
-}
-
-function secretRow(assetId, field, label, value) {
-  const key = `${assetId}:${field}`;
-  const isVisible = visibleSecrets.has(key);
-  const shown = isVisible ? value || "Sin registrar" : value ? "************" : "Sin registrar";
-  return `
-    <div class="password-row">
-      <strong>${label}:</strong>
-      <span class="password-value">${escapeHtml(shown)}</span>
-      <button class="secondary-btn" data-secret="${key}" type="button">${isVisible ? "Ocultar" : "Mostrar"}</button>
-    </div>
-  `;
-}
-
-function renderTechnical(list) {
-  renderDetailList(elements.technicalList, list, (asset) => `<div class="chip-row">${chipList(asset.technologies, "Sin tecnologias marcadas")}</div>`);
-}
-
-function renderDependencies(list) {
-  renderDetailList(elements.dependenciesList, list, (asset) => `
-    <div class="chip-row">${chipList(asset.dependencies, "Sin dependencias registradas")}</div>
-    <p>${escapeHtml(asset.dependencyNotes || "Sin notas de dependencia.")}</p>
-  `);
-}
-
-function renderCosts(list) {
-  renderDetailList(elements.costsList, list, (asset) => `
-    <div class="access-grid">
-      <span class="chip">Mensual: ${money(asset.costs?.monthly)}</span>
-      <span class="chip">Anual: ${money(asset.costs?.annual)}</span>
-      <span class="chip">Pago: ${escapeHtml(asset.costs?.paymentStatus || "Gratis")}</span>
-    </div>
-    <p>${escapeHtml(asset.costs?.notes || "Sin notas de costo.")}</p>
-  `);
-}
-
-function renderClients(list) {
-  renderDetailList(elements.clientsList, list, (asset) => `
-    <div class="chip-row">${chipList(asset.uses, "Sin uso marcado")}</div>
-    <p><strong>Cliente:</strong> ${escapeHtml(asset.clientName || "No registrado")}</p>
-    <p><strong>Propietario:</strong> ${escapeHtml(asset.owner || "No registrado")}</p>
-    <p><strong>Proyecto relacionado:</strong> ${escapeHtml(asset.relatedProject || "No registrado")}</p>
-  `);
-}
-
-function renderTasks(list) {
-  renderDetailList(elements.tasksList, list, (asset) => {
-    const tasks = asset.tasks || [];
-    if (!tasks.length) return "<span class='chip'>Sin pendientes registrados</span>";
-    return tasks.map((task) => `
-      <div class="task-item ${task.completed ? "completed" : ""}">
-        <input type="checkbox" data-task-toggle="${asset.id}:${task.id}" ${task.completed ? "checked" : ""}>
-        <div>
-          <div class="task-title">${escapeHtml(task.text)}</div>
-          <div class="task-type">${escapeHtml(task.type)}</div>
-        </div>
-        <span class="chip">${task.completed ? "Completado" : "Pendiente"}</span>
-      </div>
-    `).join("");
-  });
-}
-
-function renderDocs(list) {
-  renderDetailList(elements.docsList, list, (asset) => {
-    const docs = asset.docs || {};
-    return `
-      ${docLine("Descripcion funcional", asset.description)}
-      ${docLine("Como funciona", docs.howItWorks)}
-      ${docLine("Como actualizar", docs.howToUpdate)}
-      ${docLine("Problemas conocidos", docs.knownIssues)}
-      ${docLine("Proximas mejoras", docs.futureImprovements)}
-      ${docLine("Alojamiento", docs.hosting)}
-      ${docLine("Recuperacion", docs.recovery)}
-      ${docLine("Publicacion", docs.publishing)}
-    `;
-  });
-}
-
-function renderBackupStatus() {
-  const stamp = localStorage.getItem(BACKUP_KEY);
-  $("#backupStatus").textContent = `Ultimo respaldo: ${stamp || "sin registrar"}`;
-}
-
-function chipList(items, fallback) {
-  return (items || []).length ? items.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join("") : `<span class="chip">${fallback}</span>`;
-}
-
-function docLine(label, value) {
-  return `<p><strong>${label}:</strong> ${escapeHtml(value || "Sin documentar")}</p>`;
-}
-
-function renderDetailList(container, list, contentBuilder) {
-  container.innerHTML = "";
-  if (!list.length) return container.append(emptyState());
-  list.forEach((asset) => {
-    container.insertAdjacentHTML("beforeend", `
-      <article class="detail-card">
-        <div class="card-meta">
-          <span class="status-badge ${statusClass(asset.status)}">${escapeHtml(asset.status)}</span>
-          <span class="chip">${escapeHtml(asset.category || "Sin categoria")}</span>
-        </div>
-        <h4>${escapeHtml(asset.name)}</h4>
-        ${contentBuilder(asset)}
-      </article>
-    `);
-  });
-}
-
-function openDialog(asset = null) {
-  const normalized = asset ? normalizeAsset(asset) : null;
-  elements.form.reset();
-  currentTasks = normalized?.tasks ? structuredClone(normalized.tasks) : [];
-  $("#assetId").value = normalized?.id || "";
-  $("#dialogTitle").textContent = normalized ? "Editar aplicacion" : "Nueva aplicacion";
-  $("#deleteAssetBtn").style.display = normalized ? "inline-flex" : "none";
-
-  const values = {
-    name: normalized?.name || "",
-    category: normalized?.category || "",
-    createdAt: normalized?.createdAt || today(),
-    status: normalized?.status || "Idea",
-    description: normalized?.description || "",
-    clientName: normalized?.clientName || "",
-    owner: normalized?.owner || "",
-    relatedProject: normalized?.relatedProject || "",
-    dependencyNotes: normalized?.dependencyNotes || "",
-    monthlyCostInput: normalized?.costs?.monthly || "",
-    annualCostInput: normalized?.costs?.annual || "",
-    paymentStatus: normalized?.costs?.paymentStatus || "Gratis",
-    costNotes: normalized?.costs?.notes || "",
-    ...normalized?.urls,
-    ...normalized?.access,
-    ...normalized?.docs
-  };
-
-  Object.entries(values).forEach(([key, value]) => {
-    const input = $(`#${key}`);
-    if (input) input.value = value || "";
-  });
-
-  renderCheckboxes("techCheckboxes", TECH_OPTIONS, normalized?.technologies || []);
-  renderCheckboxes("dependencyCheckboxes", DEPENDENCY_OPTIONS, normalized?.dependencies || []);
-  renderCheckboxes("useCheckboxes", USE_OPTIONS, normalized?.uses || []);
-  renderFormTasks();
-  elements.dialog.showModal();
-}
-
-function renderCheckboxes(containerId, options, selected) {
-  const container = $(`#${containerId}`);
-  container.innerHTML = options.map((option) => `
-    <label><input type="checkbox" value="${escapeHtml(option)}" ${selected.includes(option) ? "checked" : ""}> ${escapeHtml(option)}</label>
-  `).join("");
-}
-
-function renderFormTasks() {
-  const container = $("#formTasks");
-  container.innerHTML = "";
-  if (!currentTasks.length) {
-    container.innerHTML = "<span class='chip'>Sin pendientes agregados</span>";
-    return;
-  }
-  currentTasks.forEach((task) => {
-    container.insertAdjacentHTML("beforeend", `
-      <div class="task-item ${task.completed ? "completed" : ""}">
-        <input type="checkbox" data-form-task="${task.id}" ${task.completed ? "checked" : ""}>
-        <div>
-          <div class="task-title">${escapeHtml(task.text)}</div>
-          <div class="task-type">${escapeHtml(task.type)}</div>
-        </div>
-        <button class="danger-btn" type="button" data-remove-task="${task.id}">Quitar</button>
-      </div>
-    `);
-  });
-}
-
-function collectChecked(containerId) {
-  return $$(`#${containerId} input:checked`).map((input) => input.value);
-}
-
-function collectAsset() {
-  const id = $("#assetId").value || uid();
-  const existing = assets.find((asset) => asset.id === id);
-  return normalizeAsset({
-    id,
-    name: $("#name").value.trim(),
-    category: $("#category").value.trim(),
-    description: $("#description").value.trim(),
-    createdAt: $("#createdAt").value,
-    status: $("#status").value,
-    urls: Object.fromEntries(URL_FIELDS.map(([key]) => [key, $(`#${key}`).value.trim()])),
-    access: {
-      username: $("#username").value.trim(),
-      email: $("#email").value.trim(),
-      password: $("#password").value,
-      apiKeys: $("#apiKeys").value,
-      mfaEnabled: $("#mfaEnabled").value,
-      mfaMethod: $("#mfaMethod").value.trim(),
-      mfaLocation: $("#mfaLocation").value.trim(),
-      accessNotes: $("#accessNotes").value.trim()
-    },
-    technologies: collectChecked("techCheckboxes"),
-    dependencies: collectChecked("dependencyCheckboxes"),
-    dependencyNotes: $("#dependencyNotes").value.trim(),
-    costs: {
-      monthly: Number($("#monthlyCostInput").value || 0),
-      annual: Number($("#annualCostInput").value || 0),
-      paymentStatus: $("#paymentStatus").value,
-      notes: $("#costNotes").value.trim()
-    },
-    uses: collectChecked("useCheckboxes"),
-    clientName: $("#clientName").value.trim(),
-    owner: $("#owner").value.trim(),
-    relatedProject: $("#relatedProject").value.trim(),
-    tasks: currentTasks,
-    docs: {
-      howItWorks: $("#howItWorks").value.trim(),
-      howToUpdate: $("#howToUpdate").value.trim(),
-      knownIssues: $("#knownIssues").value.trim(),
-      futureImprovements: $("#futureImprovements").value.trim(),
-      hosting: $("#hosting").value.trim(),
-      recovery: $("#recovery").value.trim(),
-      publishing: $("#publishing").value.trim()
-    },
-    createdRecordAt: existing?.createdRecordAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  });
-}
-
-function upsertAsset(asset) {
-  const index = assets.findIndex((item) => item.id === asset.id);
-  if (index >= 0) assets[index] = asset;
-  else assets.unshift(asset);
-  DataStore.save(assets);
-  render();
-}
-
-function deleteAsset(id) {
-  assets = assets.filter((asset) => asset.id !== id);
-  DataStore.save(assets);
-  render();
-}
-
-function download(filename, content, type) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function markBackup() {
-  localStorage.setItem(BACKUP_KEY, new Date().toLocaleString("es-CR"));
-  renderBackupStatus();
-}
-
-function exportJson() {
-  download(`lillytech-assets-${today()}.json`, JSON.stringify(assets, null, 2), "application/json");
-  markBackup();
-}
-
-function exportFullBackup() {
-  const backup = {
-    app: "LillyTech Asset Manager",
-    version: 2,
-    exportedAt: new Date().toISOString(),
-    assets
-  };
-  download(`lillytech-backup-completo-${today()}.json`, JSON.stringify(backup, null, 2), "application/json");
-  markBackup();
-}
-
-async function exportCsv() {
-  if (!window.ExcelJS) {
-    alert("No se pudo cargar el generador de Excel. Revise la conexion a internet y vuelva a intentar.");
-    return;
-  }
-
-  const headers = [
-    "Nombre",
-    "Categoria",
-    "Estado",
-    "Cliente",
-    "Propietario",
-    "Proyecto relacionado",
-    "Tecnologias",
-    "Dependencias",
-    "Costo mensual",
-    "Costo anual",
-    "Estado de pago",
-    "URL publica",
-    "GitHub Repository",
-    "GitHub Pages",
-    "Replit",
-    "Supabase",
-    "Apps Script",
-    "Google Drive",
-    "OneDrive",
-    "Canva",
-    "Make",
-    "Twilio",
-    "OpenAI",
-    "Pendientes abiertos",
-    "Ultima modificacion"
-  ];
-  const rows = assets.map((asset) => [
-    asset.name,
-    asset.category,
-    asset.status,
-    asset.clientName,
-    asset.owner,
-    asset.relatedProject,
-    (asset.technologies || []).join(", "),
-    (asset.dependencies || []).join(", "),
-    Number(asset.costs?.monthly || 0),
-    Number(asset.costs?.annual || 0),
-    asset.costs?.paymentStatus,
-    asset.urls?.publicUrl,
-    asset.urls?.githubRepoUrl,
-    asset.urls?.githubPagesUrl,
-    asset.urls?.replitUrl,
-    asset.urls?.supabaseUrl,
-    asset.urls?.appsScriptUrl,
-    asset.urls?.googleDriveUrl,
-    asset.urls?.oneDriveUrl,
-    asset.urls?.canvaUrl,
-    asset.urls?.makeUrl,
-    asset.urls?.twilioUrl,
-    asset.urls?.openAiUrl,
-    (asset.tasks || []).filter((task) => !task.completed).map((task) => task.text).join(" | "),
-    asset.updatedAt ? new Date(asset.updatedAt) : ""
-  ]);
-
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "LillyTech Asset Manager";
-  workbook.created = new Date();
-  workbook.modified = new Date();
-  workbook.properties.date1904 = false;
-
-  const summary = workbook.addWorksheet("Resumen", {
-    views: [{ state: "frozen", ySplit: 4 }]
-  });
-  const inventory = workbook.addWorksheet("Inventario", {
-    views: [{ state: "frozen", ySplit: 1 }]
-  });
-
-  const statusCounts = assets.reduce((acc, asset) => {
-    const key = asset.status || "Sin estado";
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-  const totalMonthly = assets.reduce((sum, asset) => sum + Number(asset.costs?.monthly || 0), 0);
-  const totalAnnual = assets.reduce((sum, asset) => sum + Number(asset.costs?.annual || 0), 0);
-  const openTasks = assets.reduce(
-    (sum, asset) => sum + (asset.tasks || []).filter((task) => !task.completed).length,
-    0
-  );
-
-  summary.mergeCells("A1:D1");
-  summary.getCell("A1").value = "Inventario LillyTech";
-  summary.getCell("A1").font = { bold: true, size: 18, color: { argb: "FFFFFFFF" } };
-  summary.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF101828" } };
-  summary.getCell("A1").alignment = { vertical: "middle" };
-  summary.getRow(1).height = 30;
-  summary.addRow([]);
-  summary.addRow(["Fecha de exportacion", today(), "Total activos", assets.length]);
-  summary.addRow(["Costo mensual total", totalMonthly, "Costo anual total", totalAnnual]);
-  summary.addRow(["Pendientes abiertos", openTasks, "Fuente", "LillyTech Asset Manager"]);
-  summary.addRow([]);
-  summary.addRow(["Estado", "Cantidad"]);
-  Object.entries(statusCounts)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .forEach(([status, count]) => summary.addRow([status, count]));
-
-  summary.getColumn(1).width = 24;
-  summary.getColumn(2).width = 18;
-  summary.getColumn(3).width = 20;
-  summary.getColumn(4).width = 22;
-  summary.getRow(7).font = { bold: true, color: { argb: "FFFFFFFF" } };
-  summary.getRow(7).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF334155" } };
-  ["B4", "D4"].forEach((cell) => {
-    summary.getCell(cell).numFmt = '"$"#,##0.00';
-  });
-
-  inventory.addRow(headers);
-  rows.forEach((row) => inventory.addRow(row));
-  inventory.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return;
-    for (let col = 12; col <= 23; col += 1) {
-      const cell = row.getCell(col);
-      const value = String(cell.value || "").trim();
-      if (value.startsWith("http://") || value.startsWith("https://")) {
-        cell.value = { text: value, hyperlink: value };
-        cell.font = { color: { argb: "FF2563EB" }, underline: true };
-      }
-    }
-  });
-  inventory.autoFilter = {
-    from: { row: 1, column: 1 },
-    to: { row: 1, column: headers.length }
-  };
-
-  const headerRow = inventory.getRow(1);
-  headerRow.height = 24;
-  headerRow.eachCell((cell) => {
-    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    cell.border = { bottom: { style: "thin", color: { argb: "FF94A3B8" } } };
-  });
-
-  inventory.columns = headers.map((header, index) => {
-    const maxLength = Math.max(
-      header.length,
-      ...rows.map((row) => String(row[index] || "").length)
-    );
-    return {
-      key: header,
-      width: Math.min(Math.max(maxLength + 2, index >= 11 && index <= 22 ? 22 : 14), 42)
-    };
-  });
-
-  inventory.eachRow((row, rowNumber) => {
-    row.eachCell((cell, colNumber) => {
-      cell.alignment = {
-        vertical: "top",
-        wrapText: colNumber >= 7
-      };
-      cell.border = {
-        bottom: { style: "hair", color: { argb: "FFE5E7EB" } }
-      };
-      if (rowNumber > 1 && rowNumber % 2 === 0) {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
-      }
-    });
-  });
-
-  ["I", "J"].forEach((column) => {
-    inventory.getColumn(column).numFmt = '"$"#,##0.00';
-  });
-  inventory.getColumn("Y").numFmt = "yyyy-mm-dd";
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  download(
-    `lillytech-assets-${today()}.xlsx`,
-    buffer,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-  );
-  markBackup();
-}
-
-function importJson(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const imported = JSON.parse(reader.result);
-      const importedAssets = Array.isArray(imported) ? imported : imported.assets;
-      if (!Array.isArray(importedAssets)) throw new Error("Formato invalido");
-      assets = importedAssets.map(normalizeAsset);
-      DataStore.save(assets);
-      render();
-      alert("Respaldo importado correctamente.");
-    } catch {
-      alert("No se pudo importar el archivo. Verifica que sea un respaldo JSON valido.");
-    }
-  };
-  reader.readAsText(file);
-}
-
-function loadSampleData() {
-  if (assets.length && !confirm("Esto agregara un ejemplo al inventario actual. ¿Continuar?")) return;
-  upsertAsset({
-    id: uid(),
-    name: "Profesor Ingles",
-    category: "IA educativa",
-    description: "Aplicacion para practicar ingles con apoyo de IA, seguimiento de progreso y ejercicios personalizados.",
-    createdAt: today(),
-    status: "Pruebas",
-    urls: {
-      demoUrl: "https://demo.lillytech.local/profesor-ingles",
-      githubRepoUrl: "https://github.com/lillytech/profesor-ingles",
-      replitUrl: "https://replit.com/@lillytech/profesor-ingles",
-      supabaseUrl: "https://supabase.com/dashboard/project/demo"
-    },
-    access: {
-      username: "admin",
-      email: "admin@lillytech.local",
-      password: "",
-      apiKeys: "",
-      mfaEnabled: "No registrado",
-      mfaMethod: "",
-      mfaLocation: "",
-      accessNotes: "Completar accesos en tercera fase."
-    },
-    technologies: ["OpenAI", "Supabase", "Replit", "HTML/CSS/JS"],
-    dependencies: ["OpenAI API", "Replit", "Supabase"],
-    dependencyNotes: "Si falla la conversacion, revisar primero OpenAI API y variables en Replit.",
-    costs: {
-      monthly: 15,
-      annual: 180,
-      paymentStatus: "De pago",
-      notes: "Costo estimado por uso de OpenAI API."
-    },
-    uses: ["Uso interno", "Producto propio"],
-    clientName: "Uso Personal",
-    owner: "Lilliana Retana",
-    relatedProject: "LillyTech Academy",
-    tasks: [
-      { id: uid(), text: "Completar documentacion de recuperacion", type: "Mejora", completed: false },
-      { id: uid(), text: "Definir version comercializable", type: "Proxima version", completed: false }
-    ],
-    docs: {
-      howItWorks: "La app usa prompts de IA para generar practica personalizada.",
-      howToUpdate: "Actualizar prompts, revisar variables y probar flujo completo.",
-      knownIssues: "Pendiente validar limites de consumo de API.",
-      futureImprovements: "Agregar historiales por estudiante.",
-      hosting: "Replit con posible migracion a GitHub Pages + Supabase.",
-      recovery: "Restaurar repositorio y variables de entorno.",
-      publishing: "Publicar desde Replit o generar version estatica."
-    },
-    createdRecordAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  });
-}
-
-function bindEvents() {
-  $$(".nav-item").forEach((button) => {
-    button.addEventListener("click", () => {
-      $$(".nav-item").forEach((item) => item.classList.remove("active"));
-      $$(".panel").forEach((panel) => panel.classList.remove("active-section"));
-      button.classList.add("active");
-      $(`[data-panel="${button.dataset.section}"]`).classList.add("active-section");
-    });
-  });
-
-  $("#newAssetBtn").addEventListener("click", () => openDialog());
-  $("#closeDialogBtn").addEventListener("click", () => elements.dialog.close());
-  $("#cancelDialogBtn").addEventListener("click", () => elements.dialog.close());
-  $("#sampleDataBtn").addEventListener("click", loadSampleData);
-  $("#exportJsonBtn").addEventListener("click", exportJson);
-  $("#exportCsvBtn").addEventListener("click", exportCsv);
-  $("#fullBackupBtn").addEventListener("click", exportFullBackup);
-  $("#importFile").addEventListener("change", (event) => {
-    const file = event.target.files[0];
-    if (file) importJson(file);
-    event.target.value = "";
-  });
-  elements.search.addEventListener("input", render);
-  elements.statusFilter.addEventListener("change", render);
-
-  document.addEventListener("click", (event) => {
-    const editId = event.target.dataset.edit;
-    const secretKey = event.target.dataset.secret;
-    const removeTaskId = event.target.dataset.removeTask;
-
-    if (editId) openDialog(assets.find((asset) => asset.id === editId));
-    if (secretKey) {
-      visibleSecrets.has(secretKey) ? visibleSecrets.delete(secretKey) : visibleSecrets.add(secretKey);
-      render();
-    }
-    if (removeTaskId) {
-      currentTasks = currentTasks.filter((task) => task.id !== removeTaskId);
-      renderFormTasks();
-    }
-  });
-
-  document.addEventListener("change", (event) => {
-    const taskToggle = event.target.dataset.taskToggle;
-    const formTask = event.target.dataset.formTask;
-    if (taskToggle) {
-      const [assetId, taskId] = taskToggle.split(":");
-      const asset = assets.find((item) => item.id === assetId);
-      const task = asset?.tasks?.find((item) => item.id === taskId);
-      if (task) {
-        task.completed = event.target.checked;
-        asset.updatedAt = new Date().toISOString();
-        DataStore.save(assets);
-        render();
-      }
-    }
-    if (formTask) {
-      const task = currentTasks.find((item) => item.id === formTask);
-      if (task) task.completed = event.target.checked;
-      renderFormTasks();
-    }
-  });
-
-  $("#addTaskBtn").addEventListener("click", () => {
-    const text = $("#taskText").value.trim();
-    if (!text) return;
-    currentTasks.push({ id: uid(), text, type: $("#taskType").value, completed: false });
-    $("#taskText").value = "";
-    renderFormTasks();
-  });
-
-  elements.form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    if (!$("#name").value.trim()) return;
-    upsertAsset(collectAsset());
-    elements.dialog.close();
-  });
-
-  $("#deleteAssetBtn").addEventListener("click", () => {
-    const id = $("#assetId").value;
-    if (id && confirm("¿Eliminar esta aplicacion del inventario?")) {
-      deleteAsset(id);
-      elements.dialog.close();
-    }
-  });
-}
-
-/* ===================== AUTENTICACION ===================== */
-
-async function refreshAfterAuth(user) {
-  currentUser = user;
-  if (user) {
-    document.getElementById("loginOverlay")?.classList.add("hidden");
-    const emailLabel = document.getElementById("loggedUser");
-    if (emailLabel) emailLabel.textContent = user.email || "";
-    syncStatus("Conectando...", "saving");
-    assets = await DataStore.load();
-    render();
-    syncStatus("Sincronizado", "ok");
-  } else {
-    assets = [];
-    document.getElementById("loginOverlay")?.classList.remove("hidden");
-  }
-}
-
-async function doLogin() {
-  const email = document.getElementById("loginEmail").value.trim();
-  const pass = document.getElementById("loginPassword").value;
-  const msg = document.getElementById("loginMsg");
-  if (!email || !pass) { msg.textContent = "Escribe correo y contrasena."; return; }
-  msg.textContent = "Ingresando...";
-  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-  if (error) { msg.textContent = "Error: " + error.message; return; }
-  msg.textContent = "";
-  await refreshAfterAuth(data.user);
-}
-
-async function doSignup() {
-  const email = document.getElementById("loginEmail").value.trim();
-  const pass = document.getElementById("loginPassword").value;
-  const msg = document.getElementById("loginMsg");
-  if (!email || pass.length < 6) { msg.textContent = "Contrasena de al menos 6 caracteres."; return; }
-  msg.textContent = "Creando cuenta...";
-  const { data, error } = await sb.auth.signUp({ email, password: pass });
-  if (error) { msg.textContent = "Error: " + error.message; return; }
-  if (data.session) {
-    msg.textContent = "";
-    await refreshAfterAuth(data.user);
-  } else {
-    msg.textContent = "Cuenta creada. Revisa tu correo para confirmar y luego inicia sesion.";
-  }
-}
-
-async function doLogout() {
-  await sb.auth.signOut();
-  await refreshAfterAuth(null);
-}
-
-function bindAuthEvents() {
-  document.getElementById("loginBtn")?.addEventListener("click", doLogin);
-  document.getElementById("signupBtn")?.addEventListener("click", doSignup);
-  document.getElementById("logoutBtn")?.addEventListener("click", doLogout);
-  document.getElementById("loginPassword")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doLogin();
-  });
-}
-
-/* ===================== ARRANQUE ===================== */
-
-renderCheckboxes("techCheckboxes", TECH_OPTIONS, []);
-renderCheckboxes("dependencyCheckboxes", DEPENDENCY_OPTIONS, []);
-renderCheckboxes("useCheckboxes", USE_OPTIONS, []);
-bindEvents();
-bindAuthEvents();
-
-(async () => {
-  const { data } = await sb.auth.getSession();
-  await refreshAfterAuth(data.session?.user || null);
-})();
