@@ -130,7 +130,7 @@ function bindEvents() {
     on(control, "input", renderAdminRows);
     on(control, "change", renderAdminRows);
   });
-  on(dom.exportCsvBtn, "click", exportCsv);
+  on(dom.exportCsvBtn, "click", exportExcel);
   on(dom.newVideoBtn, "click", startNewVideoForm);
   on(dom.cancelVideoEditBtn, "click", resetVideoForm);
   on(dom.videoAdminForm, "submit", saveAdminVideo);
@@ -741,9 +741,9 @@ function renderAdminRows() {
   toggleHidden(dom.adminEmpty, rows.length > 0);
 }
 
-function exportCsv() {
+async function exportExcel() {
   const rows = getFilteredAdminRows();
-  const header = ["colaborador", "cedula", "proyecto", "video", "fecha", "porcentaje", "completado"];
+  const headers = ["Colaborador", "Cedula", "Proyecto", "Video", "Fecha", "Porcentaje", "Completado"];
   const body = rows.map((row) => {
     const employee = row.ehs_employees || {};
     const video = row.ehs_training_videos || {};
@@ -752,18 +752,70 @@ function exportCsv() {
       employee.cedula || "",
       employee.project_site || "",
       `${getVideoCode(video)} - ${video.title || ""}`,
-      formatDate(row.completed_at),
+      formatDate(row.completed_at || row.updated_at),
       Math.round(Number(row.progress_percent || 0)),
       row.completed ? "si" : "no"
     ];
   });
-  const csv = [header, ...body].map((line) => line.map(csvCell).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+
+  if (!window.ExcelJS) {
+    const csv = [headers, ...body].map((line) => line.map(csvCell).join(",")).join("\n");
+    downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `sbm-safety-academy-registros-${new Date().toISOString().slice(0, 10)}.csv`);
+    return;
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "SBM Safety Academy";
+  workbook.created = new Date();
+  const summary = workbook.addWorksheet("Resumen");
+  const records = workbook.addWorksheet("Registros", { views: [{ state: "frozen", ySplit: 1 }] });
+  const completed = body.filter((row) => row[6] === "si").length;
+
+  summary.mergeCells("A1:D1");
+  summary.getCell("A1").value = "SBM Safety Academy - Registros";
+  summary.getCell("A1").font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+  summary.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
+  summary.addRow([]);
+  summary.addRow(["Fecha de exportacion", new Date(), "Total registros", body.length]);
+  summary.addRow(["Completados", completed, "Pendientes", body.length - completed]);
+  summary.getColumn(1).width = 24;
+  summary.getColumn(2).width = 22;
+  summary.getColumn(3).width = 18;
+  summary.getColumn(4).width = 16;
+  summary.getCell("B3").numFmt = "yyyy-mm-dd hh:mm";
+
+  records.addRow(headers);
+  body.forEach((row) => records.addRow(row));
+  records.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
+  records.getRow(1).eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  });
+  records.columns = headers.map((header, index) => {
+    const longest = Math.max(header.length, ...body.map((row) => String(row[index] || "").length));
+    return { width: Math.min(Math.max(longest + 3, 14), 44) };
+  });
+  records.eachRow((row, rowNumber) => {
+    row.eachCell((cell) => {
+      cell.alignment = { vertical: "top", wrapText: true };
+      cell.border = { bottom: { style: "hair", color: { argb: "FFE5E7EB" } } };
+      if (rowNumber > 1 && rowNumber % 2 === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  downloadBlob(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `sbm-safety-academy-registros-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `sbm-safety-academy-registros-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = filename;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
   URL.revokeObjectURL(url);
 }
 
