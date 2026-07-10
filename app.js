@@ -186,10 +186,11 @@ async function saveEmployee(event) {
 
   setFormBusy(true);
   const { data, error } = await state.supabase
-    .from("ehs_employees")
-    .upsert(payload, { onConflict: "cedula" })
-    .select()
-    .single();
+    .rpc("ehs_register_employee", {
+      p_full_name: payload.full_name,
+      p_cedula: payload.cedula,
+      p_project_site: payload.project_site
+    });
   setFormBusy(false);
 
   if (error) {
@@ -197,8 +198,14 @@ async function saveEmployee(event) {
     return;
   }
 
-  state.employee = data;
-  localStorage.setItem(STORAGE_EMPLOYEE_KEY, JSON.stringify(data));
+  const employee = Array.isArray(data) ? data[0] : data;
+  if (!employee?.id) {
+    showAlert("No se pudo confirmar el registro del colaborador. Intente nuevamente.");
+    return;
+  }
+
+  state.employee = employee;
+  localStorage.setItem(STORAGE_EMPLOYEE_KEY, JSON.stringify(employee));
   loadLocalProgress();
   updateSession();
   await loadViews();
