@@ -22,7 +22,10 @@ LMS mobile-first de microcapacitaciones EHS para colaboradores operativos de SBM
 - Los enlaces Vimeo se abren en una pestana nueva; al terminar, el colaborador regresa a la app para marcar completado.
 - Los videos Vimeo pueden firmarse juntos en una sola hoja regular de capacitacion.
 - Guardado de avance parcial en `ehs_video_views.progress_percent`.
-- Boton `Marcar como completado` habilitado solo al llegar al 95%.
+- Al terminar el video (evento `ended`) la capacitacion se marca completada
+  automaticamente, sin necesidad de presionar el boton.
+- Boton `Marcar como completado` habilitado desde el 95%, como respaldo para
+  quien adelanta el video o lo cierra antes del final.
 - Felicitacion al completar toda la ruta.
 - Recordatorio permanente de firma fisica RH-F-05.
 

@@ -116,7 +116,7 @@ function bindEvents() {
   on(dom.trainingPlayer, "play", () => startVideo(state.currentVideo?.id));
   on(dom.trainingPlayer, "timeupdate", handleCurrentVideoProgress);
   on(dom.trainingPlayer, "pause", syncCurrentVideoProgress);
-  on(dom.trainingPlayer, "ended", () => handleCurrentVideoProgress(true));
+  on(dom.trainingPlayer, "ended", finishVideoPlayback);
   on(dom.trainingPlayer, "error", () => {
     if (!state.currentVideo) return;
     showAlert(`El video ${getVideoCode(state.currentVideo)} no se pudo reproducir. Use "Abrir video en pestana nueva" o revise la ruta exacta en GitHub/Supabase.`);
@@ -440,7 +440,12 @@ function updateCurrentViewer() {
   } else if (isExternalVideo(video.file_path) && !view?.completed) {
     setText(dom.viewerProgressText, "Video externo: se abre en una pestana nueva. Al terminar de verlo, regrese y marque como completado.");
   } else {
-    setText(dom.viewerProgressText, `Avance visto: ${Math.round(progress)}%. Debe llegar al 95% para completar.`);
+    setText(
+      dom.viewerProgressText,
+      view?.completed
+        ? `Avance visto: ${Math.round(progress)}%. Capacitacion completada.`
+        : `Avance visto: ${Math.round(progress)}%. Al terminar el video se marca completado solo. Si adelanta el video, puede marcarlo desde el 95%.`
+    );
   }
   setText(
     dom.viewerSignatureNote,
@@ -489,6 +494,20 @@ async function startVideo(videoId) {
     .select()
     .single();
   if (!error && data) state.views.set(videoId, data);
+}
+
+function finishVideoPlayback() {
+  // El video llego al final: se marca completado automaticamente, sin pedir
+  // que el colaborador presione el boton. Se evita pasar por
+  // syncPartialProgress para que no haya una escritura con completed=false
+  // compitiendo con la de completeCurrentVideo.
+  const video = state.currentVideo;
+  if (!video) return;
+  state.localProgress[video.id] = 100;
+  saveLocalProgress();
+  updateCurrentViewer();
+  renderVideoLibrary();
+  completeCurrentVideo();
 }
 
 function handleCurrentVideoProgress(forceComplete = false) {
