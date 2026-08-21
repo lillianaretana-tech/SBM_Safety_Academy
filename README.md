@@ -132,6 +132,36 @@ No hace falta migracion en Supabase: se reutilizan `ehs_training_videos` y
 Nombres de archivo: sin espacios, sin tildes y respetando mayusculas/minusculas,
 porque GitHub Pages distingue.
 
+
+## Videos en Supabase Storage
+
+Para no llenar el repositorio, los videos nuevos van a Supabase Storage en vez
+de la carpeta `videos/`.
+
+La app decide por la extension del `file_path`, no por el dominio:
+
+- Termina en `.mp4`, `.webm`, `.mov`, `.m4v` (sea ruta local o URL) -> se
+  reproduce en el reproductor embebido, con seguimiento real de avance y la
+  regla del 95% para poder completar.
+- Es una URL a una pagina (Vimeo, YouTube) -> se abre en pestana nueva y el
+  colaborador marca completado a mano.
+- Termina en `.pdf` -> se abre como documento de lectura con confirmacion.
+
+Puesta en marcha del bucket:
+
+1. En Supabase: Storage -> New bucket -> nombre `capacitaciones`, marcar Public.
+2. Subir los MP4 al bucket.
+3. Copiar la URL publica de cada archivo. Tiene esta forma:
+
+```text
+https://vgkyoyosjewdygxtnqvu.supabase.co/storage/v1/object/public/capacitaciones/archivo.mp4
+```
+
+4. Guardar esa URL en `file_path`, desde el panel administrador o por SQL.
+
+Los videos que ya estan en `videos/` siguen funcionando igual; no hay que
+moverlos.
+
 ## Recomendaciones futuras
 
 - Cambiar el PIN local por autenticacion real de Supabase.

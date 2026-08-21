@@ -638,7 +638,17 @@ function getCategoryName(video) {
   return video?.ehs_training_categories?.name || state.categories.find((item) => item.id === video?.category_id)?.name || "EHS";
 }
 
+function isDirectVideoFile(filePath) {
+  // Archivo de video reproducible directamente: local en videos/ o URL directa
+  // a un .mp4 (por ejemplo Supabase Storage). Estos van al reproductor embebido
+  // y llevan seguimiento real de avance.
+  return /\.(mp4|webm|ogg|ogv|mov|m4v)($|[?#])/i.test(String(filePath || ""));
+}
+
 function isExternalVideo(filePath) {
+  // Enlace a una PAGINA externa (Vimeo, YouTube): se abre en pestana nueva.
+  // Una URL que apunta a un archivo de video NO cuenta como externa.
+  if (isDirectVideoFile(filePath)) return false;
   return /^https?:\/\//i.test(String(filePath || ""));
 }
 
