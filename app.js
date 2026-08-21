@@ -59,6 +59,10 @@ function cacheDom() {
     trainingPlayer: document.getElementById("trainingPlayer"),
     externalPlayerWrap: document.getElementById("externalPlayerWrap"),
     externalOpenLink: document.getElementById("externalOpenLink"),
+    docViewerWrap: document.getElementById("docViewerWrap"),
+    docFrame: document.getElementById("docFrame"),
+    docOpenLink: document.getElementById("docOpenLink"),
+    docReadCheck: document.getElementById("docReadCheck"),
     viewerProgressBar: document.getElementById("viewerProgressBar"),
     viewerProgressText: document.getElementById("viewerProgressText"),
     completeVideoBtn: document.getElementById("completeVideoBtn"),
@@ -116,6 +120,10 @@ function bindEvents() {
   on(dom.trainingPlayer, "error", () => {
     if (!state.currentVideo) return;
     showAlert(`El video ${getVideoCode(state.currentVideo)} no se pudo reproducir. Use "Abrir video en pestana nueva" o revise la ruta exacta en GitHub/Supabase.`);
+  });
+  on(dom.docReadCheck, "change", () => {
+    if (dom.docReadCheck?.checked) startVideo(state.currentVideo?.id);
+    updateCurrentViewer();
   });
   on(dom.completeVideoBtn, "click", completeCurrentVideo);
   on(dom.adminOpenBtn, "click", openAdmin);
@@ -316,7 +324,8 @@ function renderNextTraining() {
   toggleHidden(dom.nextTrainingPanel, !next);
   if (!next) return;
   setText(dom.nextTitle, `${getVideoCode(next)} - ${next.title || "Capacitacion"}`);
-  setText(dom.nextDescription, next.description || "Continua con la siguiente capacitacion pendiente de tu ruta.");
+  setText(dom.nextDescription, next.description || (isDocTraining(next) ? "Documento pendiente de lectura en tu ruta." : "Continua con la siguiente capacitacion pendiente de tu ruta."));
+  if (dom.continueNextBtn) dom.continueNextBtn.textContent = isDocTraining(next) ? "Leer documento" : "Continuar";
   if (dom.continueNextBtn) dom.continueNextBtn.disabled = false;
 }
 
@@ -337,24 +346,26 @@ function renderVideoLibrary() {
   state.videos.forEach((video) => {
     const view = state.views.get(video.id);
     const progress = getVideoProgress(video.id, view);
-    const status = getStatus(progress, view);
+    const status = getStatus(progress, view, video);
+    const esDoc = isDocTraining(video);
     const card = document.createElement("article");
-    card.className = "video-card";
+    card.className = esDoc ? "video-card doc-card" : "video-card";
     card.innerHTML = `
       <div class="video-body">
         <div class="video-meta">
           <span class="category-chip">${escapeHtml(getCategoryName(video))}</span>
           <span class="code-chip">${escapeHtml(getVideoCode(video))}</span>
+          <span class="format-chip">${esDoc ? "PDF" : "Video"}</span>
           <span class="status-pill ${status.className}">${status.label}</span>
         </div>
         <div>
           <h3>${escapeHtml(video.title || "Capacitacion sin titulo")}</h3>
           <p class="muted">${escapeHtml(video.description || "Sin descripcion.")}</p>
         </div>
-        <p class="muted">Avance del video: <strong>${Math.round(progress)}%</strong></p>
+        <p class="muted">${esDoc ? "Documento de lectura" : `Avance del video: <strong>${Math.round(progress)}%</strong>`}</p>
         <div class="video-actions">
-          <button class="primary-btn" type="button" data-open-video="${escapeAttribute(video.id)}">Ver video</button>
-          <a class="secondary-btn" href="${escapeAttribute(video.file_path || "#")}" target="_blank" rel="noopener">Abrir video en pestana nueva</a>
+          <button class="primary-btn" type="button" data-open-video="${escapeAttribute(video.id)}">${esDoc ? "Leer documento" : "Ver video"}</button>
+          <a class="secondary-btn" href="${escapeAttribute(video.file_path || "#")}" target="_blank" rel="noopener">${esDoc ? "Abrir documento" : "Abrir video en pestana nueva"}</a>
         </div>
         <p class="muted">Debe firmar RH-F-05 al completar esta capacitacion.</p>
       </div>
@@ -373,15 +384,25 @@ function openVideo(videoId) {
   state.currentVideo = video;
   toggleHidden(dom.videoViewer, false);
   resetExternalPlayer();
-  if (isExternalVideo(video.file_path)) {
+  if (isDocTraining(video)) {
+    toggleHidden(dom.trainingPlayer, true);
+    toggleHidden(dom.externalPlayerWrap, true);
+    toggleHidden(dom.docViewerWrap, false);
+    if (dom.docFrame) dom.docFrame.src = video.file_path || "about:blank";
+    if (dom.docOpenLink) dom.docOpenLink.href = video.file_path || "#";
+    if (dom.docReadCheck) dom.docReadCheck.checked = Boolean(state.views.get(video.id)?.completed);
+    startVideo(video.id);
+  } else if (isExternalVideo(video.file_path)) {
     toggleHidden(dom.trainingPlayer, true);
     toggleHidden(dom.externalPlayerWrap, false);
+    toggleHidden(dom.docViewerWrap, true);
     if (dom.externalOpenLink) dom.externalOpenLink.href = video.file_path || "#";
     startVideo(video.id);
     window.open(video.file_path, "_blank", "noopener");
   } else if (dom.trainingPlayer) {
     toggleHidden(dom.trainingPlayer, false);
     toggleHidden(dom.externalPlayerWrap, true);
+    toggleHidden(dom.docViewerWrap, true);
     dom.trainingPlayer.src = video.file_path || "";
     dom.trainingPlayer.load();
   }
@@ -402,7 +423,7 @@ function updateCurrentViewer() {
 
   const view = state.views.get(video.id);
   const progress = getVideoProgress(video.id, view);
-  const status = getStatus(progress, view);
+  const status = getStatus(progress, view, video);
 
   setClassName(dom.viewerStatus, `status-pill ${status.className}`);
   setText(dom.viewerStatus, status.label);
@@ -410,21 +431,41 @@ function updateCurrentViewer() {
   setText(dom.viewerTitle, `${getVideoCode(video)} - ${video.title || "Capacitacion"}`);
   setText(dom.viewerDescription, video.description || "Sin descripcion.");
   if (dom.openVideoLink) dom.openVideoLink.href = video.file_path || "#";
-  setWidth(dom.viewerProgressBar, `${Math.min(100, Math.round(progress))}%`);
-  if (isExternalVideo(video.file_path) && !view?.completed) {
+  const esDoc = isDocTraining(video);
+  setWidth(dom.viewerProgressBar, `${esDoc && !view?.completed ? 0 : Math.min(100, Math.round(progress))}%`);
+  if (esDoc && !view?.completed) {
+    setText(dom.viewerProgressText, "Documento de lectura: lealo completo y marque la casilla de confirmacion para poder completarlo.");
+  } else if (esDoc) {
+    setText(dom.viewerProgressText, "Documento leido y registrado.");
+  } else if (isExternalVideo(video.file_path) && !view?.completed) {
     setText(dom.viewerProgressText, "Video externo: se abre en una pestana nueva. Al terminar de verlo, regrese y marque como completado.");
   } else {
     setText(dom.viewerProgressText, `Avance visto: ${Math.round(progress)}%. Debe llegar al 95% para completar.`);
   }
   setText(
     dom.viewerSignatureNote,
-    isExternalVideo(video.file_path)
-      ? "El registro digital no sustituye la firma fisica. Estos videos Vimeo pueden firmarse juntos en una hoja regular de capacitacion."
-      : "El registro digital no sustituye la firma fisica. Debe firmar RH-F-05."
+    esDoc
+      ? "El registro digital no sustituye la firma fisica. Debe firmar RH-F-05 por la lectura de este documento."
+      : isExternalVideo(video.file_path)
+        ? "El registro digital no sustituye la firma fisica. Estos videos Vimeo pueden firmarse juntos en una hoja regular de capacitacion."
+        : "El registro digital no sustituye la firma fisica. Debe firmar RH-F-05."
   );
+  if (dom.openVideoLink) {
+    dom.openVideoLink.textContent = esDoc ? "Abrir documento en pestana nueva" : "Abrir video en pestana nueva";
+  }
   if (dom.completeVideoBtn) {
-    dom.completeVideoBtn.disabled = isExternalVideo(video.file_path) ? Boolean(view?.completed) : !isCompleteButtonEnabled(progress, view);
-    dom.completeVideoBtn.textContent = view?.completed ? "Completado" : "Marcar como completado";
+    if (esDoc) {
+      dom.completeVideoBtn.disabled = Boolean(view?.completed) || !dom.docReadCheck?.checked || !state.employee;
+    } else if (isExternalVideo(video.file_path)) {
+      dom.completeVideoBtn.disabled = Boolean(view?.completed);
+    } else {
+      dom.completeVideoBtn.disabled = !isCompleteButtonEnabled(progress, view);
+    }
+    dom.completeVideoBtn.textContent = view?.completed
+      ? "Completado"
+      : esDoc
+        ? "Marcar como leido"
+        : "Marcar como completado";
   }
 }
 
@@ -468,6 +509,7 @@ function handleCurrentVideoProgress(forceComplete = false) {
 
 function syncCurrentVideoProgress() {
   const video = state.currentVideo;
+  if (video && isDocTraining(video)) return;
   if (video && isExternalVideo(video.file_path)) {
     syncPartialProgress(video.id, getVideoProgress(video.id), true);
     return;
@@ -480,7 +522,7 @@ function syncCurrentVideoProgress() {
 
 function restoreCurrentVideoPosition() {
   const video = state.currentVideo;
-  if (video && isExternalVideo(video.file_path)) return;
+  if (video && (isExternalVideo(video.file_path) || isDocTraining(video))) return;
   const player = dom.trainingPlayer;
   if (!video || !player.duration || Number.isNaN(player.duration)) return;
 
@@ -495,6 +537,9 @@ function restoreCurrentVideoPosition() {
 
 function resetExternalPlayer() {
   if (dom.externalOpenLink) dom.externalOpenLink.href = "#";
+  if (dom.docFrame) dom.docFrame.src = "about:blank";
+  if (dom.docOpenLink) dom.docOpenLink.href = "#";
+  if (dom.docReadCheck) dom.docReadCheck.checked = false;
 }
 
 async function syncPartialProgress(videoId, progress, force = false) {
@@ -545,7 +590,12 @@ async function completeCurrentVideo() {
   }
   if (!requireSupabase()) return;
 
-  const progress = Math.max(95, getVideoProgress(video.id));
+  if (isDocTraining(video) && !dom.docReadCheck?.checked && !state.views.get(video.id)?.completed) {
+    showAlert("Marque la casilla de confirmacion de lectura antes de completar el documento.");
+    return;
+  }
+
+  const progress = isDocTraining(video) ? 100 : Math.max(95, getVideoProgress(video.id));
   const existing = state.views.get(video.id);
   const payload = {
     employee_id: state.employee.id,
@@ -592,8 +642,17 @@ function isExternalVideo(filePath) {
   return /^https?:\/\//i.test(String(filePath || ""));
 }
 
-function getStatus(progress, view) {
+function isPdfDoc(filePath) {
+  return /\.pdf($|[?#])/i.test(String(filePath || ""));
+}
+
+function isDocTraining(video) {
+  return isPdfDoc(video?.file_path);
+}
+
+function getStatus(progress, view, video = null) {
   if (view?.completed) return { label: "Completado", className: "completed" };
+  if (video && isDocTraining(video)) return { label: "Pendiente", className: "pending" };
   if (progress > 0) return { label: "En progreso", className: "in-progress" };
   return { label: "Pendiente", className: "pending" };
 }

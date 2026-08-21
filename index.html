@@ -125,6 +125,17 @@
             <p class="muted">Cuando termine de verlo, regrese a esta pantalla para registrar el avance. Estos videos pueden firmarse juntos en una hoja regular de capacitacion.</p>
           </div>
         </div>
+        <div id="docViewerWrap" class="doc-viewer-wrap hidden">
+          <iframe id="docFrame" class="doc-frame" title="Documento de capacitacion" src="about:blank"></iframe>
+          <div class="doc-open-panel">
+            <p class="muted">Si el documento no se ve en el celular, abralo en una pestana nueva.</p>
+            <a id="docOpenLink" class="secondary-btn" href="#" target="_blank" rel="noopener">Abrir documento en pestana nueva</a>
+            <label class="doc-confirm" for="docReadCheck">
+              <input id="docReadCheck" type="checkbox" />
+              <span>Confirmo que lei el documento completo</span>
+            </label>
+          </div>
+        </div>
         <div class="viewer-progress">
           <div class="progress-track" aria-hidden="true">
             <div id="viewerProgressBar" class="progress-bar"></div>
@@ -259,7 +270,8 @@
             </label>
             <label class="wide-field">
               file_path
-              <input id="adminVideoFilePath" type="text" placeholder="videos/EHS-I-25-Nombre-del-video.mp4" required>
+              <input id="adminVideoFilePath" type="text" placeholder="videos/EHS-I-25-Nombre.mp4  o  docs/OP-P-01-Nombre.pdf" required>
+              <small class="field-hint">Video local: <code>videos/archivo.mp4</code> &middot; Video Vimeo: enlace <code>https://...</code> &middot; Documento: <code>docs/archivo.pdf</code> (se abre como lectura con confirmacion).</small>
             </label>
             <label>
               Orden

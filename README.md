@@ -97,6 +97,41 @@ Nota importante: el PIN local no es seguridad fuerte. El modulo de crear/editar 
 
 No se suben archivos MP4 desde la app; solo se registra la metadata en Supabase.
 
+
+## Capacitaciones en PDF (documentos)
+
+La app ahora soporta capacitaciones de lectura, sin cambiar la base de datos.
+Se detectan automaticamente: si `file_path` termina en `.pdf`, la capacitacion se
+muestra como documento en vez de video.
+
+Flujo:
+
+1. Suba el PDF al repositorio en la carpeta `docs/`, por ejemplo:
+
+```text
+docs/OP-P-01-Nombre-del-procedimiento.pdf
+```
+
+2. En el panel administrador use `Agregar capacitacion` y escriba en `file_path`:
+
+```text
+docs/OP-P-01-Nombre-del-procedimiento.pdf
+```
+
+3. El colaborador ve la tarjeta con la etiqueta `PDF` y el boton `Leer documento`.
+4. El PDF se muestra embebido; si el celular no lo renderiza, hay boton para abrirlo
+   en una pestana nueva.
+5. Debe marcar la casilla `Confirmo que lei el documento completo` para habilitar
+   el boton `Marcar como leido`.
+6. Al completarlo se guarda en `ehs_video_views` con `progress_percent = 100`,
+   igual que un video, asi que cuenta en el porcentaje y en los reportes del admin.
+
+No hace falta migracion en Supabase: se reutilizan `ehs_training_videos` y
+`ehs_video_views` tal como estan.
+
+Nombres de archivo: sin espacios, sin tildes y respetando mayusculas/minusculas,
+porque GitHub Pages distingue.
+
 ## Recomendaciones futuras
 
 - Cambiar el PIN local por autenticacion real de Supabase.
