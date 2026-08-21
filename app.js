@@ -4,6 +4,12 @@ const ADMIN_PIN = "2580";
 
 const STORAGE_EMPLOYEE_KEY = "sbmSafetyAcademyEmployee";
 const STORAGE_PROGRESS_PREFIX = "sbmSafetyAcademyProgress:";
+const STORAGE_WATCHED_PREFIX = "sbmSafetyAcademyWatched:";
+
+// Porcentaje de la duracion real del video que hay que haber visto para que
+// cuente como completado. Se mide en segundos efectivamente reproducidos, no
+// en la posicion de la barra, para que adelantar el video no sirva de atajo.
+const COMPLETION_THRESHOLD = 90;
 
 const state = {
   supabase: null,
@@ -12,6 +18,8 @@ const state = {
   categories: [],
   views: new Map(),
   localProgress: {},
+  watchedSeconds: {},
+  lastPosition: {},
   progressSync: {},
   currentVideo: null,
   adminRows: [],
@@ -221,6 +229,8 @@ async function saveEmployee(event) {
 }
 
 function changeUser() {
+  state.watchedSeconds = {};
+  state.lastPosition = {};
   localStorage.removeItem(STORAGE_EMPLOYEE_KEY);
   state.employee = null;
   state.views = new Map();
@@ -362,7 +372,7 @@ function renderVideoLibrary() {
           <h3>${escapeHtml(video.title || "Capacitacion sin titulo")}</h3>
           <p class="muted">${escapeHtml(video.description || "Sin descripcion.")}</p>
         </div>
-        <p class="muted">${esDoc ? "Documento de lectura" : `Avance del video: <strong>${Math.round(progress)}%</strong>`}</p>
+        <p class="muted">${esDoc ? "Documento de lectura" : `Contenido visto: <strong>${Math.round(progress)}%</strong>`}</p>
         <div class="video-actions">
           <button class="primary-btn" type="button" data-open-video="${escapeAttribute(video.id)}">${esDoc ? "Leer documento" : "Ver video"}</button>
           <a class="secondary-btn" href="${escapeAttribute(video.file_path || "#")}" target="_blank" rel="noopener">${esDoc ? "Abrir documento" : "Abrir video en pestana nueva"}</a>
@@ -443,8 +453,8 @@ function updateCurrentViewer() {
     setText(
       dom.viewerProgressText,
       view?.completed
-        ? `Avance visto: ${Math.round(progress)}%. Capacitacion completada.`
-        : `Avance visto: ${Math.round(progress)}%. Al terminar el video se marca completado solo. Si adelanta el video, puede marcarlo desde el 95%.`
+        ? `Contenido visto: ${Math.round(progress)}%. Capacitacion completada.`
+        : `Contenido visto: ${Math.round(progress)}%. Se cuenta el tiempo reproducido, no la posicion de la barra. Al llegar al ${COMPLETION_THRESHOLD}% se marca completado.`
     );
   }
   setText(
@@ -497,26 +507,41 @@ async function startVideo(videoId) {
 }
 
 function finishVideoPlayback() {
-  // El video llego al final: se marca completado automaticamente, sin pedir
-  // que el colaborador presione el boton. Se evita pasar por
-  // syncPartialProgress para que no haya una escritura con completed=false
-  // compitiendo con la de completeCurrentVideo.
+  // El video llego al final. Se completa automaticamente solo si de verdad vio
+  // la mayor parte del contenido; si llego al final adelantando la barra, la
+  // cobertura va a ser baja y se le pide ver lo que falta.
   const video = state.currentVideo;
-  if (!video) return;
-  state.localProgress[video.id] = 100;
+  const player = dom.trainingPlayer;
+  if (!video || !player.duration || Number.isNaN(player.duration)) return;
+
+  const cobertura = calcularCobertura(video.id, player.duration);
+  state.localProgress[video.id] = cobertura;
   saveLocalProgress();
+  saveWatchedSeconds(true);
   updateCurrentViewer();
   renderVideoLibrary();
-  completeCurrentVideo();
+
+  if (cobertura >= COMPLETION_THRESHOLD) {
+    completeCurrentVideo();
+  } else {
+    const falta = Math.max(0, Math.round(COMPLETION_THRESHOLD - cobertura));
+    showAlert(`El video termino, pero solo se reprodujo el ${Math.round(cobertura)}% del contenido. Debe ver el ${falta}% que falta para que cuente como completado.`);
+    syncPartialProgress(video.id, cobertura, true);
+  }
 }
 
 function handleCurrentVideoProgress(forceComplete = false) {
   const video = state.currentVideo;
   const player = dom.trainingPlayer;
   if (!video || !player.duration || Number.isNaN(player.duration)) return;
+  if (player.seeking) return;
 
-  const percent = Math.min(100, (player.currentTime / player.duration) * 100);
-  const nextProgress = forceComplete === true ? 100 : percent;
+  // Cobertura = segundos distintos reproducidos / duracion. Adelantar la barra
+  // no suma segundos, asi que no sirve para completar.
+  const cobertura = registrarSegundoVisto(video.id, player.currentTime, player.duration);
+  saveWatchedSeconds();
+
+  const nextProgress = forceComplete === true ? Math.max(cobertura, 100) : cobertura;
   if (!state.localProgress[video.id] || nextProgress > state.localProgress[video.id]) {
     state.localProgress[video.id] = nextProgress;
     saveLocalProgress();
@@ -535,8 +560,9 @@ function syncCurrentVideoProgress() {
   }
   const player = dom.trainingPlayer;
   if (!video || !player.duration || Number.isNaN(player.duration)) return;
-  const percent = Math.min(100, (player.currentTime / player.duration) * 100);
-  if (percent > 0) syncPartialProgress(video.id, percent, true);
+  saveWatchedSeconds(true);
+  const cobertura = calcularCobertura(video.id, player.duration);
+  if (cobertura > 0) syncPartialProgress(video.id, cobertura, true);
 }
 
 function restoreCurrentVideoPosition() {
@@ -547,11 +573,14 @@ function restoreCurrentVideoPosition() {
 
   const view = state.views.get(video.id);
   if (view?.completed) return;
-  const progress = getVideoProgress(video.id, view);
-  if (progress < 2 || progress >= 95) return;
 
-  const resumeAt = Math.max(0, ((progress / 100) * player.duration) - 5);
-  if (resumeAt > 0 && resumeAt < player.duration) player.currentTime = resumeAt;
+  // Se retoma en la ultima posicion real donde iba, no en el porcentaje de
+  // cobertura, porque no son lo mismo cuando el video se vio salteado.
+  const ultima = Number(state.lastPosition[video.id] || 0);
+  if (ultima < 3) return;
+
+  const resumeAt = Math.max(0, ultima - 5);
+  if (resumeAt > 0 && resumeAt < player.duration - 1) player.currentTime = resumeAt;
 }
 
 function resetExternalPlayer() {
@@ -614,7 +643,7 @@ async function completeCurrentVideo() {
     return;
   }
 
-  const progress = isDocTraining(video) ? 100 : Math.max(95, getVideoProgress(video.id));
+  const progress = isDocTraining(video) ? 100 : Math.max(COMPLETION_THRESHOLD, getVideoProgress(video.id));
   const existing = state.views.get(video.id);
   const payload = {
     employee_id: state.employee.id,
@@ -687,11 +716,59 @@ function getStatus(progress, view, video = null) {
 }
 
 function isCompleteButtonEnabled(progress, view) {
-  return Boolean(state.employee && !view?.completed && progress >= 95);
+  return Boolean(state.employee && !view?.completed && progress >= COMPLETION_THRESHOLD);
 }
 
 function loadLocalProgress() {
   state.localProgress = safeJsonParse(localStorage.getItem(progressStorageKey()), {});
+  const guardado = safeJsonParse(localStorage.getItem(watchedStorageKey()), {});
+  state.watchedSeconds = {};
+  state.lastPosition = {};
+  Object.keys(guardado || {}).forEach((videoId) => {
+    const item = guardado[videoId] || {};
+    state.watchedSeconds[videoId] = new Set(Array.isArray(item.s) ? item.s : []);
+    state.lastPosition[videoId] = Number(item.p || 0);
+  });
+}
+
+let ultimoGuardadoSegundos = 0;
+
+function saveWatchedSeconds(forzar = false) {
+  if (!state.employee) return;
+  const ahora = Date.now();
+  if (!forzar && ahora - ultimoGuardadoSegundos < 5000) return;
+  ultimoGuardadoSegundos = ahora;
+  const salida = {};
+  Object.keys(state.watchedSeconds).forEach((videoId) => {
+    salida[videoId] = {
+      s: Array.from(state.watchedSeconds[videoId] || []),
+      p: Number(state.lastPosition[videoId] || 0)
+    };
+  });
+  try {
+    localStorage.setItem(watchedStorageKey(), JSON.stringify(salida));
+  } catch (error) {
+    console.warn("No se pudo guardar el detalle de segundos vistos.", error);
+  }
+}
+
+function watchedStorageKey() {
+  return `${STORAGE_WATCHED_PREFIX}${state.employee?.cedula || "anon"}`;
+}
+
+// Marca el segundo actual como visto y devuelve la cobertura real en %.
+function registrarSegundoVisto(videoId, currentTime, duration) {
+  if (!videoId || !duration || Number.isNaN(duration)) return 0;
+  if (!state.watchedSeconds[videoId]) state.watchedSeconds[videoId] = new Set();
+  state.watchedSeconds[videoId].add(Math.floor(currentTime));
+  state.lastPosition[videoId] = currentTime;
+  return calcularCobertura(videoId, duration);
+}
+
+function calcularCobertura(videoId, duration) {
+  const total = Math.max(1, Math.floor(duration));
+  const vistos = state.watchedSeconds[videoId]?.size || 0;
+  return Math.min(100, (vistos / total) * 100);
 }
 
 function saveLocalProgress() {
