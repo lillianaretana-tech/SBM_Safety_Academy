@@ -171,6 +171,18 @@ https://vgkyoyosjewdygxtnqvu.supabase.co/storage/v1/object/public/capacitaciones
 Los videos que ya estan en `videos/` siguen funcionando igual; no hay que
 moverlos.
 
+## Nota sobre limites de consulta
+
+Supabase (PostgREST) devuelve un maximo de 1000 filas por consulta. La carga de
+registros del panel administrador (`loadAdminRows`) pagina con `.range()` hasta
+traerlos todos; sin eso, el resumen y el exporte a Excel mostraban solo las
+primeras 1000 filas y los porcentajes salian equivocados.
+
+Las demas consultas quedan por debajo del limite: catalogo de capacitaciones
+(decenas de filas) y progreso personal del colaborador (filtrado por
+`employee_id`, una fila por capacitacion). Si el catalogo llegara a pasar de
+1000 capacitaciones, habria que paginar tambien esas.
+
 ## Recomendaciones futuras
 
 - Cambiar el PIN local por autenticacion real de Supabase.
