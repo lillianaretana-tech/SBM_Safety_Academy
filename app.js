@@ -210,7 +210,11 @@ function restoreEmployee() {
   state.employee = saved;
   dom.fullName.value = saved.full_name || "";
   dom.cedula.value = saved.cedula || "";
-  dom.projectSite.value = saved.project_site || "";
+  // Si el proyecto guardado ya no esta en la lista, queda vacio para que la
+  // persona elija uno valido.
+  const proyectoGuardado = saved.project_site || "";
+  dom.projectSite.value = proyectoGuardado;
+  if (dom.projectSite.value !== proyectoGuardado) dom.projectSite.value = "";
   loadLocalProgress();
   updateSession();
 }

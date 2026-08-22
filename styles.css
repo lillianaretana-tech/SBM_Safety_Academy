@@ -814,3 +814,31 @@ tbody tr:last-child td {
   margin: 0 0 10px;
   font-size: 0.85rem;
 }
+
+/* ===== Selector de proyecto ===== */
+#projectSite {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d7dee6;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: #fff;
+  color: inherit;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%230b3d66'%3E%3Cpath d='M4 6l4 4 4-4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px;
+  padding-right: 38px;
+}
+
+#projectSite:focus {
+  outline: none;
+  border-color: #0b3d66;
+  box-shadow: 0 0 0 3px rgba(11, 61, 102, 0.12);
+}
+
+#projectSite:invalid {
+  color: #94a3b8;
+}
