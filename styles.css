@@ -750,3 +750,67 @@ tbody tr:last-child td {
     min-height: 260px;
   }
 }
+
+/* ===== Buscador y filtros ===== */
+.search-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0 10px;
+}
+
+.search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #d7dee6;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: #fff;
+  color: inherit;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #0b3d66;
+  box-shadow: 0 0 0 3px rgba(11, 61, 102, 0.12);
+}
+
+.search-input::placeholder {
+  color: #94a3b8;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.filter-chip {
+  padding: 7px 16px;
+  border: 1px solid #d7dee6;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.filter-chip:hover {
+  border-color: #0b3d66;
+}
+
+.filter-chip.is-active {
+  background: #0b3d66;
+  border-color: #0b3d66;
+  color: #fff;
+}
+
+.search-count {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+}

@@ -24,7 +24,10 @@ const state = {
   currentVideo: null,
   adminRows: [],
   adminVideos: [],
-  adminAuthenticated: false
+  adminAuthenticated: false,
+  librarySearch: "",
+  libraryFilter: "todas",
+  adminSearch: ""
 };
 
 const dom = {};
@@ -110,6 +113,12 @@ function cacheDom() {
     adminVideoActive: document.getElementById("adminVideoActive"),
     cancelVideoEditBtn: document.getElementById("cancelVideoEditBtn"),
     adminVideoList: document.getElementById("adminVideoList"),
+    librarySearch: document.getElementById("librarySearch"),
+    librarySearchClear: document.getElementById("librarySearchClear"),
+    librarySearchCount: document.getElementById("librarySearchCount"),
+    adminVideoSearch: document.getElementById("adminVideoSearch"),
+    adminVideoSearchClear: document.getElementById("adminVideoSearchClear"),
+    adminVideoCount: document.getElementById("adminVideoCount"),
     adminVideoEmpty: document.getElementById("adminVideoEmpty")
   });
 }
@@ -132,6 +141,35 @@ function bindEvents() {
   on(dom.docReadCheck, "change", () => {
     if (dom.docReadCheck?.checked) startVideo(state.currentVideo?.id);
     updateCurrentViewer();
+  });
+  on(dom.librarySearch, "input", () => {
+    state.librarySearch = dom.librarySearch.value;
+    renderVideoLibrary();
+  });
+  on(dom.librarySearchClear, "click", () => {
+    state.librarySearch = "";
+    if (dom.librarySearch) dom.librarySearch.value = "";
+    dom.librarySearch?.focus();
+    renderVideoLibrary();
+  });
+  document.querySelectorAll("[data-library-filter]").forEach((boton) => {
+    boton.addEventListener("click", () => {
+      state.libraryFilter = boton.dataset.libraryFilter;
+      document.querySelectorAll("[data-library-filter]").forEach((b) => {
+        b.classList.toggle("is-active", b === boton);
+      });
+      renderVideoLibrary();
+    });
+  });
+  on(dom.adminVideoSearch, "input", () => {
+    state.adminSearch = dom.adminVideoSearch.value;
+    renderAdminVideos();
+  });
+  on(dom.adminVideoSearchClear, "click", () => {
+    state.adminSearch = "";
+    if (dom.adminVideoSearch) dom.adminVideoSearch.value = "";
+    dom.adminVideoSearch?.focus();
+    renderAdminVideos();
   });
   on(dom.completeVideoBtn, "click", completeCurrentVideo);
   on(dom.adminOpenBtn, "click", openAdmin);
@@ -351,9 +389,28 @@ function openNextVideo() {
 function renderVideoLibrary() {
   if (!dom.videoList) return;
   dom.videoList.innerHTML = "";
-  toggleHidden(dom.emptyState, state.videos.length > 0);
 
-  state.videos.forEach((video) => {
+  const visibles = state.videos.filter((video) => {
+    if (!coincideBusqueda(video, state.librarySearch)) return false;
+    if (state.libraryFilter === "todas") return true;
+    const completada = Boolean(state.views.get(video.id)?.completed);
+    return state.libraryFilter === "completadas" ? completada : !completada;
+  });
+
+  const hayBusqueda = Boolean(state.librarySearch) || state.libraryFilter !== "todas";
+  toggleHidden(dom.emptyState, state.videos.length > 0);
+  toggleHidden(dom.librarySearchCount, !hayBusqueda);
+  if (hayBusqueda) {
+    setText(
+      dom.librarySearchCount,
+      visibles.length === 0
+        ? "No hay capacitaciones que coincidan con la busqueda."
+        : `${visibles.length} de ${state.videos.length} capacitaciones.`
+    );
+  }
+  toggleHidden(dom.librarySearchClear, !state.librarySearch);
+
+  visibles.forEach((video) => {
     const view = state.views.get(video.id);
     const progress = getVideoProgress(video.id, view);
     const status = getStatus(progress, view, video);
@@ -686,6 +743,31 @@ function getCategoryName(video) {
   return video?.ehs_training_categories?.name || state.categories.find((item) => item.id === video?.category_id)?.name || "EHS";
 }
 
+// Normaliza para buscar sin tildes ni mayusculas: "limpieza de baNos" encuentra
+// "Limpieza de Banos" y viceversa.
+function normalizarBusqueda(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+// Coincide si TODAS las palabras del termino aparecen en algun campo del video.
+function coincideBusqueda(video, termino, incluirRuta = false) {
+  const q = normalizarBusqueda(termino);
+  if (!q) return true;
+  const campos = [
+    video.title,
+    video.description,
+    getVideoCode(video),
+    getCategoryName(video)
+  ];
+  if (incluirRuta) campos.push(video.file_path);
+  const heno = normalizarBusqueda(campos.filter(Boolean).join(" "));
+  return q.split(/\s+/).every((palabra) => heno.includes(palabra));
+}
+
 function isDirectVideoFile(filePath) {
   // Archivo de video reproducible directamente: local en videos/ o URL directa
   // a un .mp4 (por ejemplo Supabase Storage). Estos van al reproductor embebido
@@ -1011,9 +1093,24 @@ function populateCategorySelect() {
 function renderAdminVideos() {
   if (!dom.adminVideoList) return;
   dom.adminVideoList.innerHTML = "";
-  toggleHidden(dom.adminVideoEmpty, state.adminVideos.length > 0);
 
-  state.adminVideos.forEach((video) => {
+  const visibles = state.adminVideos.filter((video) =>
+    coincideBusqueda(video, state.adminSearch, true)
+  );
+
+  toggleHidden(dom.adminVideoEmpty, state.adminVideos.length > 0);
+  toggleHidden(dom.adminVideoCount, !state.adminSearch);
+  toggleHidden(dom.adminVideoSearchClear, !state.adminSearch);
+  if (state.adminSearch) {
+    setText(
+      dom.adminVideoCount,
+      visibles.length === 0
+        ? "Ninguna capacitacion coincide con la busqueda."
+        : `${visibles.length} de ${state.adminVideos.length} capacitaciones.`
+    );
+  }
+
+  visibles.forEach((video) => {
     const card = document.createElement("article");
     card.className = "admin-video-card";
     card.innerHTML = `

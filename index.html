@@ -157,6 +157,17 @@
           </div>
           <button id="reloadBtn" class="ghost-btn" type="button">Actualizar</button>
         </div>
+        <div class="search-bar">
+          <input id="librarySearch" class="search-input" type="search" inputmode="search"
+                 placeholder="Buscar por nombre, codigo o categoria" aria-label="Buscar capacitacion">
+          <button id="librarySearchClear" class="ghost-btn hidden" type="button">Limpiar</button>
+        </div>
+        <div class="filter-chips" role="group" aria-label="Filtrar por estado">
+          <button class="filter-chip is-active" type="button" data-library-filter="todas">Todas</button>
+          <button class="filter-chip" type="button" data-library-filter="pendientes">Pendientes</button>
+          <button class="filter-chip" type="button" data-library-filter="completadas">Completadas</button>
+        </div>
+        <p id="librarySearchCount" class="muted search-count hidden"></p>
         <div id="videoList" class="video-list"></div>
         <div id="emptyState" class="empty-state hidden">
           No hay capacitaciones activas en Supabase. Agregue videos desde el panel administrador o revise la tabla ehs_training_videos.
@@ -287,6 +298,12 @@
             </div>
           </form>
 
+          <div class="search-bar">
+            <input id="adminVideoSearch" class="search-input" type="search" inputmode="search"
+                   placeholder="Buscar por nombre, codigo, categoria o ruta" aria-label="Buscar capacitacion en el panel">
+            <button id="adminVideoSearchClear" class="ghost-btn hidden" type="button">Limpiar</button>
+          </div>
+          <p id="adminVideoCount" class="muted search-count hidden"></p>
           <div id="adminVideoList" class="admin-video-list"></div>
           <p id="adminVideoEmpty" class="muted hidden">No hay capacitaciones para administrar.</p>
         </section>
