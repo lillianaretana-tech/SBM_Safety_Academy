@@ -899,17 +899,37 @@ async function loadAdminData() {
 
 async function loadAdminRows() {
   if (!requireSupabase()) return;
-  const { data, error } = await state.supabase
-    .from("ehs_video_views")
-    .select("completed_at, progress_percent, completed, ehs_employees(full_name, cedula, project_site), ehs_training_videos(id, video_code, title)")
-    .order("updated_at", { ascending: false });
 
-  if (error) {
-    showAlert(`No se pudieron cargar los registros del administrador: ${error.message}`);
-    return;
+  // Supabase corta en 1000 filas por consulta. Sin paginar, el panel y el
+  // exporte mostraban solo las primeras 1000 y el resumen salia mal.
+  const TAMANO_PAGINA = 1000;
+  const todas = [];
+  let desde = 0;
+
+  for (;;) {
+    const { data, error } = await state.supabase
+      .from("ehs_video_views")
+      .select("completed_at, progress_percent, completed, ehs_employees(full_name, cedula, project_site), ehs_training_videos(id, video_code, title)")
+      .order("updated_at", { ascending: false })
+      .range(desde, desde + TAMANO_PAGINA - 1);
+
+    if (error) {
+      showAlert(`No se pudieron cargar los registros del administrador: ${error.message}`);
+      return;
+    }
+
+    const pagina = data || [];
+    todas.push(...pagina);
+    if (pagina.length < TAMANO_PAGINA) break;
+    desde += TAMANO_PAGINA;
+
+    if (desde > 100000) {
+      showAlert("Hay demasiados registros para cargarlos todos. Se muestran los mas recientes.");
+      break;
+    }
   }
 
-  state.adminRows = data || [];
+  state.adminRows = todas;
   populateVideoFilter();
   renderAdminSummary();
   renderAdminRows();
