@@ -1198,6 +1198,11 @@ async function saveAdminVideo(event) {
     return;
   }
 
+  if (state.access?.role !== "admin") {
+    showAlert("Solo el administrador puede cambiar las capacitaciones.");
+    return;
+  }
+
   const id = dom.adminVideoId.value;
   const payload = {
     category_id: dom.adminVideoCategory.value,
@@ -1206,8 +1211,7 @@ async function saveAdminVideo(event) {
     description: dom.adminVideoDescription.value.trim(),
     file_path: dom.adminVideoFilePath.value.trim(),
     sort_order: Number(dom.adminVideoOrder.value || 0),
-    active: dom.adminVideoActive.checked,
-    updated_at: new Date().toISOString()
+    active: dom.adminVideoActive.checked
   };
 
   if (!payload.video_code || !payload.title || !payload.file_path) {
@@ -1215,13 +1219,20 @@ async function saveAdminVideo(event) {
     return;
   }
 
-  const request = id
-    ? state.supabase.from("ehs_training_videos").update(payload).eq("id", id)
-    : state.supabase.from("ehs_training_videos").insert(payload);
-
-  const { error } = await request;
-  if (error) {
-    showAlert(`No se pudo guardar la capacitacion. Revise permisos RLS para insert/update en ehs_training_videos. Detalle: ${error.message}`);
+  // El servidor valida el codigo del administrador antes de guardar.
+  const { data: saved, error } = await state.supabase.rpc("ehs_video_save", {
+    p_code: state.access.code,
+    p_id: id || null,
+    p_category_id: payload.category_id,
+    p_video_code: payload.video_code,
+    p_title: payload.title,
+    p_description: payload.description,
+    p_file_path: payload.file_path,
+    p_sort_order: payload.sort_order,
+    p_active: payload.active
+  });
+  if (error || !saved || !saved.ok) {
+    showAlert(`No se pudo guardar la capacitacion. ${error ? error.message : (saved && saved.error) || ""}`);
     return;
   }
 
@@ -1236,13 +1247,10 @@ async function toggleAdminVideo(videoId) {
   const video = state.adminVideos.find((item) => item.id === videoId);
   if (!video) return;
 
-  const { error } = await state.supabase
-    .from("ehs_training_videos")
-    .update({ active: !video.active, updated_at: new Date().toISOString() })
-    .eq("id", videoId);
-
-  if (error) {
-    showAlert(`No se pudo cambiar el estado del video. Revise permisos RLS para update en ehs_training_videos. Detalle: ${error.message}`);
+  if (state.access?.role !== "admin") return;
+  const { data: res, error } = await state.supabase.rpc("ehs_video_toggle", { p_code: state.access.code, p_id: videoId });
+  if (error || !res || !res.ok) {
+    showAlert(`No se pudo cambiar el estado del video. ${error ? error.message : (res && res.error) || ""}`);
     return;
   }
 
