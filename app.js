@@ -1,6 +1,5 @@
 const SUPABASE_URL = "https://vgkyoyosjewdygxtnqvu.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZna3lveW9zamV3ZHlneHRucXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NTAxNDAsImV4cCI6MjA5ODIyNjE0MH0.oDxSWg61UFLqMh2MeEW6yxarZAjobhEA6TWm0KS_7CA";
-const ADMIN_PIN = "2580";
 
 const STORAGE_EMPLOYEE_KEY = "sbmSafetyAcademyEmployee";
 const STORAGE_PROGRESS_PREFIX = "sbmSafetyAcademyProgress:";
@@ -25,6 +24,7 @@ const state = {
   adminRows: [],
   adminVideos: [],
   adminAuthenticated: false,
+  access: null,
   librarySearch: "",
   libraryFilter: "todas",
   adminSearch: ""
@@ -322,9 +322,7 @@ async function loadViews() {
   state.views = new Map();
   if (!state.employee || !requireSupabase(false)) return;
   const { data, error } = await state.supabase
-    .from("ehs_video_views")
-    .select("*")
-    .eq("employee_id", state.employee.id);
+    .rpc("ehs_my_views", { p_employee_id: state.employee.id });
   if (error) {
     showAlert(`No se pudo cargar el progreso personal: ${error.message}`);
     return;
@@ -549,21 +547,13 @@ async function startVideo(videoId) {
   if (!videoId || !state.employee || !requireSupabase(false)) return;
   if (state.views.has(videoId)) return;
 
-  const payload = {
-    employee_id: state.employee.id,
-    video_id: videoId,
-    started_at: new Date().toISOString(),
-    progress_percent: getVideoProgress(videoId),
-    completed: false,
-    signature_required: true,
-    signature_reminder_ack: false
-  };
-
-  const { data, error } = await state.supabase
-    .from("ehs_video_views")
-    .upsert(payload, { onConflict: "employee_id,video_id" })
-    .select()
-    .single();
+  const { data, error } = await state.supabase.rpc("ehs_save_view", {
+    p_employee_id: state.employee.id,
+    p_video_id: videoId,
+    p_progress: getVideoProgress(videoId),
+    p_completed: false,
+    p_signature_ack: false
+  });
   if (!error && data) state.views.set(videoId, data);
 }
 
@@ -665,22 +655,13 @@ async function syncPartialProgress(videoId, progress, force = false) {
   if (!force && roundedProgress < 1) return;
   if (!force && !progressedEnough && !waitedEnough) return;
 
-  const payload = {
-    employee_id: state.employee.id,
-    video_id: videoId,
-    started_at: existing?.started_at || new Date().toISOString(),
-    progress_percent: Math.max(Number(existing?.progress_percent || 0), roundedProgress),
-    completed: false,
-    signature_required: true,
-    signature_reminder_ack: false,
-    updated_at: new Date().toISOString()
-  };
-
-  const { data, error } = await state.supabase
-    .from("ehs_video_views")
-    .upsert(payload, { onConflict: "employee_id,video_id" })
-    .select()
-    .single();
+  const { data, error } = await state.supabase.rpc("ehs_save_view", {
+    p_employee_id: state.employee.id,
+    p_video_id: videoId,
+    p_progress: Math.max(Number(existing?.progress_percent || 0), roundedProgress),
+    p_completed: false,
+    p_signature_ack: false
+  });
 
   if (!error && data) {
     state.views.set(videoId, data);
@@ -705,24 +686,13 @@ async function completeCurrentVideo() {
   }
 
   const progress = isDocTraining(video) ? 100 : Math.max(COMPLETION_THRESHOLD, getVideoProgress(video.id));
-  const existing = state.views.get(video.id);
-  const payload = {
-    employee_id: state.employee.id,
-    video_id: video.id,
-    started_at: existing?.started_at || new Date().toISOString(),
-    completed_at: new Date().toISOString(),
-    progress_percent: progress,
-    completed: true,
-    signature_required: true,
-    signature_reminder_ack: true,
-    updated_at: new Date().toISOString()
-  };
-
-  const query = existing
-    ? state.supabase.from("ehs_video_views").update(payload).eq("id", existing.id)
-    : state.supabase.from("ehs_video_views").insert(payload);
-
-  const { data, error } = await query.select().single();
+  const { data, error } = await state.supabase.rpc("ehs_save_view", {
+    p_employee_id: state.employee.id,
+    p_video_id: video.id,
+    p_progress: progress,
+    p_completed: true,
+    p_signature_ack: true
+  });
   if (error) {
     showAlert(`No se pudo guardar la capacitacion completada: ${error.message}`);
     return;
@@ -874,66 +844,98 @@ async function openAdmin() {
 
 function closeAdmin() {
   toggleHidden(dom.adminModal, true);
+  lockAdmin();
+}
+
+// Al cerrar el panel se vuelve a pedir el codigo y se borran los datos de memoria.
+function lockAdmin() {
+  state.adminAuthenticated = false;
+  state.access = null;
+  state.adminRows = [];
+  if (dom.adminRows) dom.adminRows.innerHTML = "";
+  toggleHidden(dom.adminPinForm, false);
+  toggleHidden(dom.adminContent, true);
+  if (window.SBMAccess) window.SBMAccess.reset();
 }
 
 async function unlockAdmin(event) {
   event.preventDefault();
-  if (dom.adminPin.value !== ADMIN_PIN) {
-    showAlert("Clave de administrador incorrecta.");
+  if (!requireSupabase()) return;
+  const code = dom.adminPin.value.trim();
+  const { data, error } = await state.supabase.rpc("ehs_login", { p_code: code });
+  dom.adminPin.value = "";
+  if (error || !data) {
+    showAlert("No se pudo validar el codigo. Revise la conexion e intente de nuevo.");
     return;
   }
+  if (!data.ok) {
+    showAlert(data.error === "locked"
+      ? "Demasiados intentos fallidos. Espere unos 10 minutos e intente de nuevo."
+      : "Codigo incorrecto.");
+    return;
+  }
+  state.access = { code, role: data.role, name: data.name, projects: data.projects || [] };
   state.adminAuthenticated = true;
+  applyAccessUi();
   toggleHidden(dom.adminPinForm, true);
   toggleHidden(dom.adminContent, false);
+  setAdminTab("records");
   await loadAdminData();
+}
+
+// El administrador ve todo; el supervisor solo registros y matriz de sus proyectos.
+function applyAccessUi() {
+  const isAdmin = state.access?.role === "admin";
+  toggleHidden(dom.adminVideosTab, !isAdmin);
+  const accessTab = document.getElementById("adminAccessTab");
+  if (accessTab) toggleHidden(accessTab, !isAdmin);
+  const who = document.getElementById("adminWho");
+  if (who) {
+    who.textContent = isAdmin
+      ? `Ingreso: ${state.access.name} (administrador)`
+      : `Ingreso: ${state.access.name} - ${state.access.projects.join(", ")}`;
+  }
 }
 
 function setAdminTab(tab) {
   const isRecords = tab === "records";
+  const isVideos = tab === "videos";
   toggleClass(dom.adminRecordsTab, "active", isRecords);
-  toggleClass(dom.adminVideosTab, "active", !isRecords);
+  toggleClass(dom.adminVideosTab, "active", isVideos);
   toggleHidden(dom.adminRecordsPanel, !isRecords);
-  toggleHidden(dom.adminVideosPanel, isRecords);
+  toggleHidden(dom.adminVideosPanel, !isVideos);
+  if (window.SBMAccess) window.SBMAccess.setTab(tab);
 }
 
 async function loadAdminData() {
-  await Promise.all([loadAdminRows(), loadAdminVideos()]);
-  populateCategorySelect();
+  if (state.access?.role === "admin") {
+    await Promise.all([loadAdminRows(), loadAdminVideos()]);
+    populateCategorySelect();
+  } else {
+    await loadAdminRows();
+  }
 }
 
 async function loadAdminRows() {
   if (!requireSupabase()) return;
+  if (!state.access) return;
 
-  // Supabase corta en 1000 filas por consulta. Sin paginar, el panel y el
-  // exporte mostraban solo las primeras 1000 y el resumen salia mal.
-  const TAMANO_PAGINA = 1000;
-  const todas = [];
-  let desde = 0;
-
-  for (;;) {
-    const { data, error } = await state.supabase
-      .from("ehs_video_views")
-      .select("completed_at, progress_percent, completed, ehs_employees(full_name, cedula, project_site), ehs_training_videos(id, video_code, title)")
-      .order("updated_at", { ascending: false })
-      .range(desde, desde + TAMANO_PAGINA - 1);
-
-    if (error) {
-      showAlert(`No se pudieron cargar los registros del administrador: ${error.message}`);
-      return;
-    }
-
-    const pagina = data || [];
-    todas.push(...pagina);
-    if (pagina.length < TAMANO_PAGINA) break;
-    desde += TAMANO_PAGINA;
-
-    if (desde > 100000) {
-      showAlert("Hay demasiados registros para cargarlos todos. Se muestran los mas recientes.");
-      break;
-    }
+  // El servidor valida el codigo y devuelve solo lo que corresponde:
+  // todo para el administrador, solo los proyectos asignados para un supervisor.
+  const { data, error } = await state.supabase.rpc("ehs_records", { p_code: state.access.code });
+  if (error || !data) {
+    showAlert(`No se pudieron cargar los registros: ${error ? error.message : "sin respuesta"}`);
+    return;
+  }
+  if (!data.ok) {
+    showAlert(data.error === "locked"
+      ? "Demasiados intentos fallidos. Espere unos 10 minutos."
+      : "La sesion ya no es valida. Cierre el panel e ingrese de nuevo.");
+    return;
   }
 
-  state.adminRows = todas;
+  state.adminRows = data.rows || [];
+  if (window.SBMMatriz) window.SBMMatriz.refresh();
   populateVideoFilter();
   renderAdminSummary();
   renderAdminRows();

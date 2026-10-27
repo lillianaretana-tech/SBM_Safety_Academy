@@ -7,7 +7,10 @@
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="app.js?v=20260709-project-site" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="app.js?v=20261027-access" defer></script>
+  <script src="matriz.js?v=20261027" defer></script>
+  <script src="accesos.js?v=20261027" defer></script>
 </head>
 <body>
   <header class="app-header">
@@ -195,13 +198,14 @@
         <div>
           <p class="eyebrow">Administracion</p>
           <h2 id="adminTitle">Panel SBM Safety Academy</h2>
+          <p id="adminWho" class="field-hint"></p>
         </div>
         <button id="adminCloseBtn" class="icon-btn" type="button" aria-label="Cerrar panel">x</button>
       </div>
 
       <form id="adminPinForm" class="pin-form">
         <label>
-          Clave temporal
+          Codigo de acceso
           <input id="adminPin" type="password" inputmode="numeric" autocomplete="off" required>
         </label>
         <button class="primary-btn" type="submit">Entrar</button>
@@ -211,6 +215,7 @@
         <div class="admin-tabs" role="tablist" aria-label="Opciones administrativas">
           <button id="adminRecordsTab" class="tab-btn active" type="button">Registros</button>
           <button id="adminVideosTab" class="tab-btn" type="button">Capacitaciones</button>
+          <button id="adminAccessTab" class="tab-btn hidden" type="button">Accesos</button>
         </div>
 
         <section id="adminRecordsPanel" class="admin-section">
@@ -247,6 +252,25 @@
             <button id="exportCsvBtn" class="secondary-btn" type="button">Exportar Excel</button>
           </div>
 
+          <div id="matrizBox" class="filters" style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px">
+            <h3 style="width:100%;margin:0">Matriz de capacitaciones OP-MAT-10</h3>
+            <p class="field-hint" style="width:100%;margin:0">Llena la plantilla oficial con los videos completados del proyecto y a&ntilde;o elegidos. La plantilla no se modifica, solo se llenan los nombres, "Cumple" y la fecha.</p>
+            <label>
+              Plantilla original (.xlsx)
+              <input id="matrizTemplate" type="file" accept=".xlsx">
+            </label>
+            <label>
+              Proyecto
+              <select id="matrizProject"><option value="">Elija el proyecto</option></select>
+            </label>
+            <label>
+              A&ntilde;o
+              <input id="matrizYear" type="number" min="2020" max="2100" step="1">
+            </label>
+            <button id="matrizBtn" class="primary-btn" type="button">Generar matriz</button>
+            <div id="matrizReport" style="width:100%"></div>
+          </div>
+
           <div class="table-wrap">
             <table>
               <thead>
@@ -263,6 +287,54 @@
             </table>
           </div>
           <p id="adminEmpty" class="muted hidden">No hay registros con esos filtros.</p>
+        </section>
+
+        <section id="adminAccessPanel" class="admin-section hidden">
+          <p class="field-hint">Cada supervisor entra con su propio codigo y solo ve los proyectos que se le asignen aqui. Los codigos se guardan cifrados: si alguien lo olvida, genere uno nuevo con Editar.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Nombre</th><th>Rol</th><th>Proyectos</th><th>Estado</th><th>Ultimo ingreso</th><th></th></tr>
+              </thead>
+              <tbody id="accessRows"></tbody>
+            </table>
+          </div>
+          <form id="accessForm" class="filters" style="margin-top:16px">
+            <h3 id="accessFormTitle" style="width:100%;margin:0">Nuevo acceso</h3>
+            <input type="hidden" id="accessId">
+            <label>
+              Nombre
+              <input id="accessName" type="text" required autocomplete="off">
+            </label>
+            <label>
+              Rol
+              <select id="accessRole">
+                <option value="supervisor">Supervisor</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </label>
+            <label>
+              Codigo (4 a 8 numeros)
+              <input id="accessCode" type="text" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]*">
+            </label>
+            <div id="accessProjectsWrap" style="width:100%">
+              <strong>Proyectos que puede ver</strong>
+              <div id="accessProjectsBox"></div>
+              <label style="margin-top:6px">
+                Otro proyecto (separe con comas si son varios)
+                <input id="accessExtra" type="text" autocomplete="off">
+              </label>
+            </div>
+            <label style="display:inline-flex;gap:6px;align-items:center">
+              <input id="accessActive" type="checkbox" checked> Activo
+            </label>
+            <label id="accessRegenWrap" style="display:none;gap:6px;align-items:center">
+              <input id="accessRegen" type="checkbox"> Generar un codigo nuevo
+            </label>
+            <button class="primary-btn" type="submit">Guardar</button>
+            <button id="accessCancel" class="secondary-btn" type="button">Limpiar</button>
+            <div id="accessMsg" style="width:100%"></div>
+          </form>
         </section>
 
         <section id="adminVideosPanel" class="admin-section hidden">
